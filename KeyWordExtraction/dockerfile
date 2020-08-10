@@ -1,0 +1,6 @@
+from datasense/space_npl_docker as base
+
+COPY . /app
+WORKDIR /app
+# Run the specified command within the container.
+CMD [ "python", "KeywordExtracter.py"]

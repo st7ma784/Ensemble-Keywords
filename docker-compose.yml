@@ -1,0 +1,12 @@
+version: '3.7'
+
+services:
+    sentimentanalyser:
+        build: SentimentAnalizer
+        volumes:
+            -./DATA/:/app/DATA
+
+    keywordextractor:
+        build: KeywordExtracter
+        volumes:
+            -./DATA/:/app/DATA
