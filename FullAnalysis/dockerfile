@@ -1,0 +1,15 @@
+FROM python:latest as base
+RUN mkdir /install
+WORKDIR /install
+COPY requirements.txt /requirements.txt
+RUN pip install -U --no-cache-dir --prefix="/install" -r /requirements.txt
+FROM base
+
+#bring basic tools across
+COPY --from=builder /install /usr/local
+
+COPY . /app
+WORKDIR /app
+RUN python setup.py
+# Run the specified command within the container.
+CMD [ "python", "Full.py"]

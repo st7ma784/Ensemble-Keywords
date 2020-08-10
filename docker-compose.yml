@@ -1,12 +1,7 @@
 version: '2.2'
 
 services:
-    sentimentanalyser:
-        container_name: sentiment
-        build: SentimentAnalysisNLTK
-
-
-    keywordextractor:
-        container_name: keywords
-        build: KeyWordExtraction
+    fullanaysis:
+        container_name: full
+        build: FullAnalysis
 

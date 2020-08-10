@@ -1,8 +1,9 @@
+import csv,os
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from collections import OrderedDict,defaultdict
 import numpy as np
 import spacy
 from spacy.lang.en.stop_words import STOP_WORDS
-import csv,os
 nlp = spacy.load('en_core_web_sm')
 
 class TextRank4Keyword():
@@ -136,17 +137,29 @@ def main():
     tr4w = TextRank4Keyword()
     words=[]
     Filename=os.path.join("DATA","DataoftheHeart_LakeDistrictsurvey.csv")
+    totalsentiment=defaultdict(int)
+    scores=list()
+    totals=defaultdict(int)
+    sid=SentimentIntensityAnalyzer()
     with open(Filename, mode='r') as infile:
         reader = list(csv.DictReader(infile))
         desiredkey=list(reader[0].keys())[17]
 
         for row in reader:
             text=row.get(desiredkey,"N/A")
+            scores.append(sid.polarity_scores(text))
             tr4w.analyze(text, candidate_pos = ['NOUN', 'PROPN'], window_size=4, lower=False)
             words+=tr4w.get_keywords(5)
-    totals=defaultdict(int)
+   
     for word,score in words:
         totals[word]=totals.get(word,0)+score
     print(totals)
+    for score in scores:
+        for key,value in score.items():
+            totalsentiment[key] += value
+    for key in totalsentiment:
+        totalsentiment[key]=totalsentiment[key]/len(scores)
+    print(totalsentiment)
+
 if __name__=="__main__":
     main()
