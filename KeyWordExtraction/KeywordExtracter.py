@@ -143,10 +143,6 @@ def main():
         desiredkey=list(reader[0].keys())[17]
         for row in reader:
             text=row.get(desiredkey,"N/A")
-        
-
-
-    ​
             tr4w.analyze(text, candidate_pos = ['NOUN', 'PROPN'], window_size=4, lower=False)
             tr4w.get_keywords(10)
 

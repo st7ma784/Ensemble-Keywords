@@ -1,18 +1,22 @@
 import csv,os
+from collections import defaultdict
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
-
-from nltk.sentiment.vader import SentimentIntensityAnalyzer
+scores=list()
+sid=SentimentIntensityAnalyzer()
 Filename=os.path.join("DATA","DataoftheHeart_LakeDistrictsurvey.csv")
 with open(Filename, mode='r') as infile:
     reader = list(csv.DictReader(infile))
     desiredkey=list(reader[0].keys())[17]
-    for row in reader:
+
+    for id,row in enumerate(reader):
         text=row.get(desiredkey,"N/A")
+        scores.append(sid.polarity_scores(text))
 
-        # Calling the polarity_scores method on sid and passing in the message_text outputs a dictionary with negative, neutral, positive, and compound scores for the input text
-        scores = sid.polarity_scores(message_text)
+totals=defaultdict(int)
 
-        # Here we loop through the keys contained in scores (pos, neu, neg, and compound scores) and print the key-value pairs on the screen
-
-        for key in sorted(scores):
-            print('{0}: {1}, '.format(key, scores[key]), end='')
+for score in scores:
+    for key,value in score.items():
+        totals[key] += value
+for key in totals:
+    totals[key]=totals[key]/len(scores)
+print(totals)

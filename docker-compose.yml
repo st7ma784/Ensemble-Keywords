@@ -1,12 +1,12 @@
-version: '3.7'
+version: '2.2'
 
 services:
     sentimentanalyser:
-        build: SentimentAnalizer
-        volumes:
-            -./DATA/:/app/DATA
+        container_name: sentiment
+        build: SentimentAnalysisNLTK
+
 
     keywordextractor:
-        build: KeywordExtracter
-        volumes:
-            -./DATA/:/app/DATA
+        container_name: keywords
+        build: KeyWordExtraction
+

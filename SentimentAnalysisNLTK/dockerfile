@@ -5,5 +5,6 @@ RUN pip install -U nltk
 
 COPY . /app
 WORKDIR /app
+RUN python setup.py
 # Run the specified command within the container.
 CMD [ "python", "SentimentAnalizer.py"]
