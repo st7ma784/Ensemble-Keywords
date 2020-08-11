@@ -1,4 +1,5 @@
 FROM python:latest as base
+FROM base as builder
 RUN mkdir /install
 WORKDIR /install
 COPY requirements.txt /requirements.txt
@@ -10,6 +11,7 @@ COPY --from=builder /install /usr/local
 
 COPY . /app
 WORKDIR /app
+RUN python -m spacy download en_core_web_sm
 RUN python setup.py
 # Run the specified command within the container.
 CMD [ "python", "Full.py"]

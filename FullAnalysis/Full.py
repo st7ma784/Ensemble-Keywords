@@ -5,7 +5,6 @@ import numpy as np
 import spacy
 from spacy.lang.en.stop_words import STOP_WORDS
 nlp = spacy.load('en_core_web_sm')
-
 class TextRank4Keyword():
     """Extract keywords from text"""
     
@@ -148,18 +147,19 @@ def main():
         for row in reader:
             text=row.get(desiredkey,"N/A")
             scores.append(sid.polarity_scores(text))
-            tr4w.analyze(text, candidate_pos = ['NOUN', 'PROPN'], window_size=4, lower=False)
-            words+=tr4w.get_keywords(5)
+            candidates=['NOUN', 'PROPN']
+            tr4w.analyze(text, candidate_pos = ['ADJ'], window_size=4, lower=False)
+            words+=tr4w.get_keywords(10)
    
     for word,score in words:
         totals[word]=totals.get(word,0)+score
-    print(totals)
+    totals=OrderedDict(sorted(totals.items(), key=lambda t: t[1], reverse=True))
     for score in scores:
         for key,value in score.items():
             totalsentiment[key] += value
     for key in totalsentiment:
         totalsentiment[key]=totalsentiment[key]/len(scores)
+    print(list(totals.items())[:10])
     print(totalsentiment)
-
 if __name__=="__main__":
     main()
