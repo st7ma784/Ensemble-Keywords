@@ -1,10 +1,19 @@
-import csv,os
+import csv,os,random
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from collections import OrderedDict,defaultdict
 import numpy as np
 import spacy
 from spacy.lang.en.stop_words import STOP_WORDS
 nlp = spacy.load('en_core_web_sm')
+
+def weighted_random(pairs):
+    total = sum(pair[1] for pair in pairs)
+    r = random.uniform(0, total)
+    for (name, weight) in pairs:
+        r -= weight
+        if r <= 0: return name
+
+
 class TextRank4Keyword():
     """Extract keywords from text"""
     
@@ -20,15 +29,33 @@ class TextRank4Keyword():
         for word in STOP_WORDS.union(set(stopwords)):
             lexeme = nlp.vocab[word]
             lexeme.is_stop = True
-    
+    def check_verb(self, token):
+        if token.pos_ == 'VERB':
+            indirect_object = False
+            direct_object = False
+            for item in token.children:
+                if(item.dep_ == "iobj" or item.dep_ == "pobj"):
+                    indirect_object = True
+                if (item.dep_ == "dobj" or item.dep_ == "dative"):
+                    direct_object = True
+            if indirect_object and direct_object:
+                return 'TRANVERB'
+            elif direct_object and not indirect_object:
+                return 'TRANVERB'
+            elif not direct_object and not indirect_object:
+                return 'INTRANVERB'
+            else:
+                return 'VERB'
+        else:
+            return token.pos_
     def sentence_segment(self, doc, candidate_pos, lower):
-        """Store those words only in cadidate_pos"""
+        """Store those words only in cadidate_pos == could implement with matcher for more complex structures"""
         sentences = []
         for sent in doc.sents:
             selected_words = []
             for token in sent:
-                # Store words only with cadidate POS tag
-                if token.pos_ in candidate_pos and token.is_stop is False:
+                pos=self.check_verb(token)
+                if (pos in candidate_pos or token.tag_ in candidate_pos) and token.is_stop is False:
                     if lower is True:
                         selected_words.append(token.text.lower())
                     else:
@@ -134,6 +161,24 @@ class TextRank4Keyword():
 
 def main():
     tr4w = TextRank4Keyword()
+
+    sentences=["The ADJ NOUN ADV TRANVERBs the NOUN.",
+    "ADJ, ADJ NOUN ADV TRANVERBs a ADJ, ADJ NOUN.",
+    "NOUN is a ADJ NOUN.",
+    "INTJ, NOUN!",
+    "NOUNs INTRANVERB!",
+    "The NOUN INTRANVERBs like a ADJ NOUN.",
+    "NOUNs INTRANVERB like ADJ NOUN.",
+    "Why does the NOUN INTRANVERB?",
+    "INTRANVERB ADV like a ADJ NOUN.",
+    "NOUN, NOUN, and NOUN.",
+    "Where is the ADJ NOUN?",
+    "All NOUNs TRANVERB ADJ, ADJ NOUN.",
+    "Never TRANVERB a NOUN.",
+    ]
+    wordtypes=["ADJ","INTRANVERB","TRANVERB","INTJ","ADV","PRPN","VERB","NOUN"]
+    poem="\n".join(random.sample(sentences,10))
+    wordlist={}
     words=[]
     Filename=os.path.join("DATA","DataoftheHeart_LakeDistrictsurvey.csv")
     totalsentiment=defaultdict(int)
@@ -143,15 +188,23 @@ def main():
     with open(Filename, mode='r') as infile:
         reader = list(csv.DictReader(infile))
         desiredkey=list(reader[0].keys())[17]
-
         for row in reader:
             text=row.get(desiredkey,"N/A")
             scores.append(sid.polarity_scores(text))
-            candidates=['NOUN', 'PROPN']
-            tr4w.analyze(text, candidate_pos = ['ADJ'], window_size=4, lower=False)
-            words+=tr4w.get_keywords(10)
-   
-    for word,score in words:
+        for wtype in wordtypes:
+            print("Now looking for common "+ wtype)
+            for row in reader:
+                
+                text=row.get(desiredkey,"N/A")
+                tr4w.analyze(text, candidate_pos = [wtype], window_size=4, lower=False)
+                wordlist[wtype]=wordlist.get(wtype,list())+tr4w.get_keywords(10)
+            while wtype in poem:
+                wchoice=weighted_random(wordlist[wtype])
+                if wchoice is None:
+                    poem=poem.replace(wtype,"Oh",1) #because we've found a place for interjections. GRR
+                else:
+                    poem=poem.replace(wtype,wchoice,1)
+    for word,score in wordlist['ADJ']:
         totals[word]=totals.get(word,0)+score
     totals=OrderedDict(sorted(totals.items(), key=lambda t: t[1], reverse=True))
     for score in scores:
@@ -161,5 +214,7 @@ def main():
         totalsentiment[key]=totalsentiment[key]/len(scores)
     print(list(totals.items())[:10])
     print(totalsentiment)
+    print("From: "+desiredkey)
+    print(poem)
 if __name__=="__main__":
     main()
