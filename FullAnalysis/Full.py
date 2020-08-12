@@ -22,7 +22,10 @@ class TextRank4Keyword():
         self.min_diff = 1e-5 # convergence threshold
         self.steps = 10 # iteration steps
         self.node_weight = None # save keywords and its weight
-
+        with open('./abstractnounlist.txt','r') as file:
+            ABST=file.readlines()
+        self.ABSTLIST=[word.lower().replace("\n","") for word in ABST]
+        #print(self.ABSTLIST)
     
     def set_stopwords(self, stopwords):  
         """Set stop words"""
@@ -46,6 +49,13 @@ class TextRank4Keyword():
                 return 'INTRANVERB'
             else:
                 return 'VERB'
+        elif token.pos_ == 'NOUN':
+            #print(token.text)
+            if token.text.lower() in self.ABSTLIST:
+                #print("Found to be ABST" + token.text)
+                return 'ABSTNOUN'
+            else:
+                return token.pos_
         else:
             return token.pos_
     def sentence_segment(self, doc, candidate_pos, lower):
@@ -164,19 +174,19 @@ def main():
 
     sentences=["The ADJ NOUN ADV TRANVERBs the NOUN.",
     "ADJ, ADJ NOUN ADV TRANVERBs a ADJ, ADJ NOUN.",
-    "NOUN is a ADJ NOUN.",
-    "INTJ, NOUN!",
+    "ABSTNOUN is a ADJ NOUN.",
+    "INTJ, ABSTNOUN!",
     "NOUNs INTRANVERB!",
     "The NOUN INTRANVERBs like a ADJ NOUN.",
     "NOUNs INTRANVERB like ADJ NOUN.",
     "Why does the NOUN INTRANVERB?",
     "INTRANVERB ADV like a ADJ NOUN.",
-    "NOUN, NOUN, and NOUN.",
+    "ABSTNOUN, ABSTNOUN, and ABSTNOUN.",
     "Where is the ADJ NOUN?",
     "All NOUNs TRANVERB ADJ, ADJ NOUN.",
     "Never TRANVERB a NOUN.",
     ]
-    wordtypes=["ADJ","INTRANVERB","TRANVERB","INTJ","ADV","PRPN","VERB","NOUN"]
+    wordtypes=["ADJ","ABSTNOUN","INTRANVERB","TRANVERB","INTJ","ADV","PRPN","VERB","NOUN"]
     poem="\n".join(random.sample(sentences,10))
     wordlist={}
     words=[]
