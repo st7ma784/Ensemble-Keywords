@@ -8,10 +8,13 @@ FROM base
 
 #bring basic tools across
 COPY --from=builder /install /usr/local
-
-COPY . /app
-WORKDIR /app
 RUN python -m spacy download en_core_web_sm
+
+COPY setup.py .
 RUN python setup.py
+COPY ./DATA /app/DATA
+COPY Full.py /app
+WORKDIR /app
+
 # Run the specified command within the container.
 CMD [ "python", "Full.py"]

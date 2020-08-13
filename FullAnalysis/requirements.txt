@@ -1,2 +1,10 @@
 spacy
 nltk
+plotly
+bokeh
+textblob
+pandas
+numpy
+dash
+chart_studio
+psutil
