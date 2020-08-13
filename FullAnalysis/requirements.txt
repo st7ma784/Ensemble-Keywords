@@ -8,3 +8,4 @@ numpy
 dash
 chart_studio
 psutil
+flask

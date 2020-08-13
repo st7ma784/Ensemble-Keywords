@@ -1,8 +1,8 @@
-import csv,os,random
+import csv,os,random,spacy
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from collections import OrderedDict,defaultdict
 import numpy as np
-import spacy
+from io import BytesIO
 from bokeh.plotting import figure, output_file, show
 import plotly.graph_objects as go
 from chart_studio.plotly import plot,iplot
@@ -12,6 +12,8 @@ import numpy as np
 import chart_studio.plotly as py
 from multiprocessing.pool import ThreadPool as Pool
 from spacy.lang.en.stop_words import STOP_WORDS
+from flask import Flask, render_template, send_file
+app=Flask(__name__)
 nlp = spacy.load('en_core_web_sm')
 
 def weighted_random(pairs):
@@ -251,7 +253,6 @@ def CreateGraph(df):
     
     #py.plot(fig, filename='2dhistogram-2d-density-plot-subplots')
 
-
 def CreateGraph2(df):
     AgeGroups=df['Age group'].unique()
     Traces={}
@@ -272,7 +273,10 @@ def CreateGraph2(df):
         title = "Sentiment by age group"
     )
     fig = go.Figure(data=data,layout=layout)
-    fig.show(renderer="png")
+    img=BytesIO()
+    fig.savefig(img)
+    img.seek(0)
+    return send_file(img, mimetype='image/png')
     #py.plot(fig, filename='2dhistogram-2d-density-plot-subplots')
 
 wordtypes=["ADJ","ABSTNOUN","INTRANVERB","TRANVERB","INTJ","ADV","PRPN","VERB","NOUN"]
@@ -346,5 +350,11 @@ def main():
     for word,score in wordlist['ADJ']:
         totals[word]=totals.get(word,0)+score
     totals=OrderedDict(sorted(totals.items(), key=lambda t: t[1], reverse=True))
+    @app.route('/')
+    def index():
+        return CreateGraph2(df)
+    app.run(debug=True)
+
 if __name__=="__main__":
     main()
+    
