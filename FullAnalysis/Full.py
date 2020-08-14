@@ -19,13 +19,24 @@ import dash_html_components as html
 from dash.dependencies import Input, Output
 
 
-app = dash.Dash(__name__)
-server = app.server
-
-
-
-
 nlp = spacy.load('en_core_web_sm')
+
+wordtypes=["ADJ","ABSTNOUN","INTRANVERB","TRANVERB","INTJ","ADV","PRPN","VERB","NOUN"]
+wordlist={wtype:list() for wtype in wordtypes}
+sentences=["The ADJ NOUN ADV TRANVERBs the NOUN.",
+"ADJ, ADJ NOUN ADV TRANVERBs a ADJ, ADJ NOUN.",
+"ABSTNOUN is a ADJ NOUN.",
+"INTJ, ABSTNOUN!",
+"NOUNs INTRANVERB!",
+"The NOUN INTRANVERBs like a ADJ NOUN.",
+"NOUNs INTRANVERB like ADJ NOUN.",
+"Why does the NOUN INTRANVERB?",
+"INTRANVERB ADV like a ADJ NOUN.",
+"ABSTNOUN, ABSTNOUN, and ABSTNOUN.",
+"Where is the ADJ NOUN?",
+"All NOUNs TRANVERB ADJ, ADJ NOUN.",
+"Never TRANVERB a NOUN.",
+]
 
 def weighted_random(pairs):
     total = sum(pair[1] for pair in pairs)
@@ -264,21 +275,23 @@ def CreateGraph(df):
     
     #py.plot(fig, filename='2dhistogram-2d-density-plot-subplots')
 
-def CreateGraph2(df):
-    AgeGroups=df['Age group'].unique()
+def polarity(df,Column,Group):
+    df['polarity'] = df[Column].map(lambda text: TextBlob(text).sentiment.polarity)
+
+    Groups=df[Group].unique()
     Traces={}
-    for age in AgeGroups:
+    for grp in Groups:
         r=random.randint(0,255)
         g=random.randint(0,255)
         b=random.randint(0,255)
-        Traces[age]=go.Box(
-            y=df.loc[df['Age group'] == age]['polarity'],
-            name = age,
+        Traces[g]=go.Box(
+            y=df.loc[df[Group] == grp]['polarity'],
+            name = grp,
             marker = dict(
                 color = ''.join(['rgb(',str(r),", ", str(g), ", ", str(b),' )'])
             )
         )
-    Figures=OrderedDict(sorted(Traces.items(), key=lambda t: int(t[0][:2]), reverse=True))
+    Figures=OrderedDict(sorted(Traces.items(), key=lambda t: t[0], reverse=False))
 
     data = list(Figures.values())
     layout = go.Layout(
@@ -289,8 +302,7 @@ def CreateGraph2(df):
     #img.seek(0)
 
     return fig
-wordtypes=["ADJ","ABSTNOUN","INTRANVERB","TRANVERB","INTJ","ADV","PRPN","VERB","NOUN"]
-wordlist={wtype:list() for wtype in wordtypes}
+
 def createWordList(df):
     tr4w = TextRank4Keyword()
     df.apply(lambda x:TextRankAnalyse(tr4w,x))
@@ -318,58 +330,69 @@ def createpoem(poem):
 def main():
     global wordtypes
 
+    app = dash.Dash(__name__)
+    server = app.server
     sid=SentimentIntensityAnalyzer()
-    sentences=["The ADJ NOUN ADV TRANVERBs the NOUN.",
-    "ADJ, ADJ NOUN ADV TRANVERBs a ADJ, ADJ NOUN.",
-    "ABSTNOUN is a ADJ NOUN.",
-    "INTJ, ABSTNOUN!",
-    "NOUNs INTRANVERB!",
-    "The NOUN INTRANVERBs like a ADJ NOUN.",
-    "NOUNs INTRANVERB like ADJ NOUN.",
-    "Why does the NOUN INTRANVERB?",
-    "INTRANVERB ADV like a ADJ NOUN.",
-    "ABSTNOUN, ABSTNOUN, and ABSTNOUN.",
-    "Where is the ADJ NOUN?",
-    "All NOUNs TRANVERB ADJ, ADJ NOUN.",
-    "Never TRANVERB a NOUN.",
-    ]
-    
-    poem="\n".join(random.sample(sentences,10))
-    words=[]
     Filename=os.path.join("DATA","DataoftheHeart_LakeDistrictsurvey.csv")
-    totals=defaultdict(int)
-
-    polaritykeys=sid.polarity_scores("").keys()
-    with open(Filename, mode='r') as infile:
-        reader = list(csv.DictReader(infile))
-        desiredkey=list(reader[0].keys())[17]
-    print("From: "+desiredkey)
+    #with open(Filename, mode='r') as infile:
+    #    reader = list(csv.DictReader(infile))
+    #    desiredkey=list(reader[0].keys())[17]
+    #print("From: "+desiredkey)
     df = pd.read_csv(Filename) # open file
-    df = df[~df[desiredkey].isnull()] #filter out empty rows
-    df[desiredkey] = preprocess(df[desiredkey]) #clean text up a bit
-    parralelproc(df[desiredkey],createWordList)#create our wordlist
+    #df = df[~df[desiredkey].isnull()] #filter out empty rows
+    #df[desiredkey] = preprocess(df[desiredkey]) #clean text up a bit
+    #parralelproc(df[desiredkey],createWordList)#create our wordlist
     #print(wordlist)
-    print(createpoem(poem))
-    for key in polaritykeys:
-        df[key]=df[desiredkey].map(lambda text: sid.polarity_scores(text)[key]) # create rows for sentiment [pos, nue, neg, compound]
-        print(key + " score for column : " + str(sum(df[key])))  # lets just sanity check those scores. 
-    df['polarity'] = df[desiredkey].map(lambda text: TextBlob(text).sentiment.polarity) # lets make a single polarity value using textblob
-    df['review_len'] = df[desiredkey].astype(str).apply(len)
-    df['word_count'] = df[desiredkey].apply(lambda x: len(str(x).split()))
-    fig=CreateGraph2(df)
-    for word,score in wordlist['ADJ']:
-        totals[word]=totals.get(word,0)+score
-    totals=OrderedDict(sorted(totals.items(), key=lambda t: t[1], reverse=True))
-    AgeGroups=df['Age group'].unique()
+    #    polaritykeys=sid.polarity_scores("").keys()
+    #for key in polaritykeys:
+    #    df[key]=df[desiredkey].map(lambda text: sid.polarity_scores(text)[key]) # create rows for sentiment [pos, nue, neg, compound]
+    #    print(key + " score for column : " + str(sum(df[key])))  # lets just sanity check those scores. 
+    #df['polarity'] = df[desiredkey].map(lambda text: TextBlob(text).sentiment.polarity) # lets make a single polarity value using textblob
+    
+    #df['review_len'] = df[desiredkey].astype(str).apply(len)
+    #df['word_count'] = df[desiredkey].apply(lambda x: len(str(x).split()))
+    
+    #AgeGroups=df['Age group'].unique()
+    Functions={"polarity":polarity}
+    TextFields=["How important is it for you to have access to open / green space?",'"Thinking about national parks or the countryside in general, what do you fear future generations might not witness or experience?  "',"Open/green space matters because …","What is one key thing that you value about the area, or what it is that puts you off?",]
+    GroupFields=['Age group','Postcode / Zip','Country','Gender']
+    app.layout = html.Div([        
+        html.P('Graph Types:'),
+        dcc.Dropdown(id='Function-select', options=[{'label': function, 'value': function} for function in Functions],style={'width': '100\%'}),
+        html.P('Text entries to process:'),
+        dcc.Dropdown(id='Column-select', options=[{'label': Column, 'value': Column} for Column in TextFields],style={'width': '100\%'}),
+        html.P('Grouped By'),
+        dcc.Dropdown(id='Groupby-select', options=[{'label': Group, 'value': Group} for Group in GroupFields], style={'width': '100\%'}),
+        dcc.Graph('Boxplot-graph', config={'displayModeBar': False}),
 
-    app.layout = html.Div([  #can convert this to list graph functions 
-        html.Div([dcc.Dropdown(id='Function-select', options=[{'label': age, 'value': age} for age in AgeGroups], value='TOR', style={'width': '140px'})]),
-        dcc.Graph('Boxplot-graph', config={'displayModeBar': False})
-        ])
+        html.P('view most common words of type:'),
+        dcc.Dropdown(id='WordType', options=[{'label': WordType, 'value': WordType} for WordType in wordlist], style={'width': '100\%'}),
+        html.Div(id='TextOut'),
 
-    @app.callback(Output('Boxplot-graph', 'figure'),[Input('Function-select', 'value')])
-    def update_graph(input):
-        return CreateGraph2(df)
+        html.P('Here\'s a poem generated with responses in this column'),
+
+        html.Div(id='PoemOut'),
+    ])
+
+    @app.callback(Output('Boxplot-graph', 'figure'),[Input('Function-select', 'value'),Input('Column-select','value'),Input('Groupby-select','value')])
+    def update_graph(Function,Column,Group):
+        newdf = df[~df[Column].isnull()] #filter out empty rows
+        newdf[Column] = preprocess(newdf[Column]) #clean text up a bit
+        return globals()[Function](newdf,Column,Group)
+    @app.callback(Output('TextOut', component_property='children'),[Input('Column-select','value'),Input('WordType','value')])
+    def update_keywords(Column,Type):
+        newdf = df[~df[Column].isnull()] #filter out empty rows
+        newdf[Column] = preprocess(newdf[Column]) #clean text up a bit
+        parralelproc(newdf[Column],createWordList)#create our wordlist
+        totals=defaultdict(int)
+        for word,score in wordlist[Type]:
+            totals[word]=totals.get(word,0)+score
+    
+        return 'Output: {}'.format(sorted(totals.items(), key=lambda t: t[1], reverse=True)) 
+    @app.callback(Output('PoemOut', component_property='children'),[Input('Column-select','value')])
+    def update_poem(Column):
+        poem="\n".join(random.sample(sentences,10))
+        return 'Output: {}'.format(print(createpoem(poem)))
 
     app.run_server(host='0.0.0.0',debug=True, port=8050)
 

@@ -10,3 +10,6 @@ chart_studio
 psutil
 flask
 orca
+dash-renderer
+dash-html-components
+dash-core-components
