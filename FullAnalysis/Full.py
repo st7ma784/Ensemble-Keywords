@@ -234,11 +234,11 @@ def polarity(df,Column,Group):
                 color = ''.join(['rgb(',str(r),", ", str(g), ", ", str(b),' )'])
             )
         )
-    Figures=OrderedDict(sorted(Traces.items(), key=lambda t: t[0], reverse=False))
+    Figures=OrderedDict(sorted(Traces.items(), key=lambda t: str(t[0])[:2], reverse=False))
 
     data = list(Figures.values())
     layout = go.Layout(
-        title = "Sentiment by age group"
+        title = "Sentiment by group"
     )
     fig = go.Figure(data=data,layout=layout)
     #img=BytesIO(fig.to_image())
@@ -262,7 +262,7 @@ def parralelproc(params,df,func,n_cores=os.cpu_count()):
         
         if len(params)>1:
             #df_split = np.array_split(params, n_cores)
-            results=pool.map(partial(func, df),params)
+            results=pool.starmap(func, zip(repeat(df),params))
         else:
             df_split=np.array_split(df,n_cores)
             result=pool.starmap(func, zip(df_split,repeat(params[0])))
@@ -315,8 +315,8 @@ def main():
         html.P('view most common words across by group:'),
         dcc.Dropdown(id='group-dropdown',style={'width': '100\%'}),
         html.Div(id='filterTextOut'),
-        #html.P('Here\'s a poem generated with responses in this column'),
-        #html.Div(id='PoemOut'),
+        html.P('Here\'s a poem generated with responses in this column'),
+        html.Div(id='PoemOut'),
     ])
 
     @app.callback(Output('Boxplot-graph', 'figure'),[Input('Function-select', 'value'),Input('Column-select','value'),Input('Groupby-select','value')])
@@ -334,9 +334,11 @@ def main():
             totals[word]=totals.get(word,0)+score
     
         return 'Output: {}'.format(sorted(totals.items(), key=lambda t: t[1], reverse=True)[:10]) 
-    '''@app.callback(Output('PoemOut', component_property='children'),[Input('Column-select','value')])
+    @app.callback(Output('PoemOut', component_property='children'),[Input('Column-select','value')])
     def update_poem(Column):
         poem="\n".join(random.sample(sentences,10))
+        newdf = df[~df[Column].isnull()] #filter out empty rows
+        newdf[Column] = preprocess(newdf[Column]) 
         wordlist=parralelproc(wordtypes,newdf[Column],createWordList)#create our wordlist
 
         for wtype in wordtypes:
@@ -346,7 +348,7 @@ def main():
                     poem=poem.replace(wtype,"Oh",1) #because we've found a place for interjections. GRR
                 else:
                     poem=poem.replace(wtype,wchoice,1)
-        return 'Output: {}'.format(poem)'''
+        return 'Output: {}'.format(poem)
     @app.callback(Output('group-dropdown', 'options'),[Input('Groupby-select', 'value')])
     def update_date_dropdown(name):
         newdf = df[~df[name].isnull()]
@@ -354,7 +356,7 @@ def main():
     @app.callback(Output('filterTextOut', component_property='children'),[Input('Column-select','value'),Input('WordType','value'),Input('group-dropdown', 'value'),Input('Groupby-select', 'value'),])
     def update_keywordsbygroup(Column,Type,name,group):
         newdf = df[~df[Column].isnull()] #filter out empty rows
-        newdf=newdf[df[group]==name]
+        newdf=newdf[newdf[group]==name]
         newdf[Column] = preprocess(newdf[Column]) #clean text up a bit
         wordlist=parralelproc([Type],newdf[Column],createWordList)#create our wordlist
         totals=defaultdict(int)
@@ -365,7 +367,7 @@ def main():
         return [{'label': i, 'value': i} for i in newdf[name].unique()]
 
 
-    app.run_server(host='0.0.0.0',debug=False, port=8050)
+    app.run_server(host='0.0.0.0',debug=True, port=8050)
 
 
 if __name__=="__main__":
