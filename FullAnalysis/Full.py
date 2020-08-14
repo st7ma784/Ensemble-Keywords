@@ -273,11 +273,9 @@ def CreateGraph2(df):
         title = "Sentiment by age group"
     )
     fig = go.Figure(data=data,layout=layout)
-    img=BytesIO()
-    fig.savefig(img)
-    img.seek(0)
-    return send_file(img, mimetype='image/png')
-    #py.plot(fig, filename='2dhistogram-2d-density-plot-subplots')
+    #img=BytesIO(fig.to_image())
+    #img.seek(0)
+    return py.plot(fig, filename='2dhistogram-2d-density-plot-subplots')
 
 wordtypes=["ADJ","ABSTNOUN","INTRANVERB","TRANVERB","INTJ","ADV","PRPN","VERB","NOUN"]
 wordlist={wtype:list() for wtype in wordtypes}
