@@ -17,8 +17,9 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output
-
-
+from functools import partial
+from itertools import repeat
+import itertools
 nlp = spacy.load('en_core_web_sm')
 
 wordtypes=["ADJ","ABSTNOUN","INTRANVERB","TRANVERB","INTJ","ADV","PRPN","VERB","NOUN"]
@@ -217,64 +218,6 @@ def preprocess(ReviewText):
     ReviewText = ReviewText.str.replace('(\xa0)', ' ')  
     return ReviewText
 
-def CreateGraph(df):
-
-    trace1 = go.Scatter(
-        x=df['Age group'], y=df['polarity'], mode='markers', name='points',
-        marker=dict(color='rgb(102,0,0)', size=2, opacity=0.4)
-    )
-    trace2 = go.Histogram2dContour(
-        x=df['Age group'], y=df['polarity'], name='density', ncontours=20,
-        colorscale='Hot', reversescale=True, showscale=False
-    )
-    trace3 = go.Histogram(
-        x=df['Age group'], name='Age density',
-        marker=dict(color='rgb(102,0,0)'),
-        yaxis='y2'
-    )
-    trace4 = go.Histogram(
-        y=df['polarity'], name='Sentiment Polarity density', marker=dict(color='rgb(102,0,0)'),
-        xaxis='x2'
-    )
-    data = [trace1, trace2, trace3, trace4]
-
-    layout = go.Layout(
-        showlegend=False,
-        autosize=False,
-        width=600,
-        height=550,
-        xaxis=dict(
-            domain=[0, 0.85],
-            showgrid=False,
-            zeroline=False
-        ),
-        yaxis=dict(
-            domain=[0, 0.85],
-            showgrid=False,
-            zeroline=False
-        ),
-        margin=dict(
-            t=50
-        ),
-        hovermode='closest',
-        bargap=0,
-        xaxis2=dict(
-            domain=[0.85, 1],
-            showgrid=False,
-            zeroline=False
-        ),
-        yaxis2=dict(
-            domain=[0.85, 1],
-            showgrid=False,
-            zeroline=False
-        )
-    )
-
-    fig = go.Figure(data=data, layout=layout)
-    fig.show(renderer="png")
-    
-    #py.plot(fig, filename='2dhistogram-2d-density-plot-subplots')
-
 def polarity(df,Column,Group):
     df['polarity'] = df[Column].map(lambda text: TextBlob(text).sentiment.polarity)
 
@@ -303,30 +246,31 @@ def polarity(df,Column,Group):
 
     return fig
 
-def createWordList(df):
+def createWordList(df,param):
     tr4w = TextRank4Keyword()
-    df.apply(lambda x:TextRankAnalyse(tr4w,x))
-
-def TextRankAnalyse(tr4w, text):
+    toprankslist=list(df.apply(lambda x:TextRankAnalyse(tr4w,x,param)))
+    return list(itertools.chain.from_iterable(toprankslist))
+def TextRankAnalyse(tr4w, text,wtype):
     global wordlist
-    for wtype in wordtypes:
-        tr4w.analyze(text, candidate_pos = [wtype], window_size=4, lower=False)
-        wordlist[wtype]+=tr4w.get_keywords(10)
-def parralelproc(df,func,n_cores=os.cpu_count()):
-    df_split = np.array_split(df, n_cores)
-    pool = Pool(n_cores)
-    pool.map(func, df_split)
-    pool.close()
-    pool.join()
-def createpoem(poem):
-    for wtype in wordtypes:
-        while wtype in poem:
-                wchoice=weighted_random(wordlist[wtype])
-                if wchoice is None:
-                    poem=poem.replace(wtype,"Oh",1) #because we've found a place for interjections. GRR
-                else:
-                    poem=poem.replace(wtype,wchoice,1)
-    return poem
+    tr4w.analyze(text, candidate_pos = [wtype], window_size=4, lower=False)
+    return tr4w.get_keywords(10)
+    
+def parralelproc(params,df,func,n_cores=os.cpu_count()):
+    #print(params)
+    results=[]
+    with Pool(n_cores) as pool:
+        
+        if len(params)>1:
+            #df_split = np.array_split(params, n_cores)
+            results=pool.map(partial(func, df),params)
+        else:
+            df_split=np.array_split(df,n_cores)
+            result=pool.starmap(func, zip(df_split,repeat(params[0])))
+            results.append(list(itertools.chain.from_iterable(result)))
+    
+    #print(results)
+    return dict(zip(params,results)) 
+
 def main():
     global wordtypes
 
@@ -351,27 +295,28 @@ def main():
     
     #df['review_len'] = df[desiredkey].astype(str).apply(len)
     #df['word_count'] = df[desiredkey].apply(lambda x: len(str(x).split()))
-    
+    keys=list(df.keys())
     #AgeGroups=df['Age group'].unique()
     Functions={"polarity":polarity}
-    TextFields=["How important is it for you to have access to open / green space?",'"Thinking about national parks or the countryside in general, what do you fear future generations might not witness or experience?  "',"Open/green space matters because …","What is one key thing that you value about the area, or what it is that puts you off?",]
+    TextFields=[10,12,13,14,15,17,19,20,21,27]
     GroupFields=['Age group','Postcode / Zip','Country','Gender']
     app.layout = html.Div([        
         html.P('Graph Types:'),
         dcc.Dropdown(id='Function-select', options=[{'label': function, 'value': function} for function in Functions],style={'width': '100\%'}),
         html.P('Text entries to process:'),
-        dcc.Dropdown(id='Column-select', options=[{'label': Column, 'value': Column} for Column in TextFields],style={'width': '100\%'}),
+        dcc.Dropdown(id='Column-select', options=[{'label': keys[key], 'value': keys[key]} for key in TextFields],style={'width': '100\%'}),
         html.P('Grouped By'),
         dcc.Dropdown(id='Groupby-select', options=[{'label': Group, 'value': Group} for Group in GroupFields], style={'width': '100\%'}),
         dcc.Graph('Boxplot-graph', config={'displayModeBar': False}),
-
-        html.P('view most common words of type:'),
+        html.P('find common words of type:'),
         dcc.Dropdown(id='WordType', options=[{'label': WordType, 'value': WordType} for WordType in wordlist], style={'width': '100\%'}),
+        html.P('Overall:'),
         html.Div(id='TextOut'),
-
-        html.P('Here\'s a poem generated with responses in this column'),
-
-        html.Div(id='PoemOut'),
+        html.P('view most common words across by group:'),
+        dcc.Dropdown(id='group-dropdown',style={'width': '100\%'}),
+        html.Div(id='filterTextOut'),
+        #html.P('Here\'s a poem generated with responses in this column'),
+        #html.Div(id='PoemOut'),
     ])
 
     @app.callback(Output('Boxplot-graph', 'figure'),[Input('Function-select', 'value'),Input('Column-select','value'),Input('Groupby-select','value')])
@@ -383,18 +328,45 @@ def main():
     def update_keywords(Column,Type):
         newdf = df[~df[Column].isnull()] #filter out empty rows
         newdf[Column] = preprocess(newdf[Column]) #clean text up a bit
-        parralelproc(newdf[Column],createWordList)#create our wordlist
+        wordlist=parralelproc([Type],newdf[Column],createWordList)#create our wordlist
         totals=defaultdict(int)
-        for word,score in wordlist[Type]:
+        for (word,score) in wordlist[Type]:
             totals[word]=totals.get(word,0)+score
     
-        return 'Output: {}'.format(sorted(totals.items(), key=lambda t: t[1], reverse=True)) 
-    @app.callback(Output('PoemOut', component_property='children'),[Input('Column-select','value')])
+        return 'Output: {}'.format(sorted(totals.items(), key=lambda t: t[1], reverse=True)[:10]) 
+    '''@app.callback(Output('PoemOut', component_property='children'),[Input('Column-select','value')])
     def update_poem(Column):
         poem="\n".join(random.sample(sentences,10))
-        return 'Output: {}'.format(print(createpoem(poem)))
+        wordlist=parralelproc(wordtypes,newdf[Column],createWordList)#create our wordlist
 
-    app.run_server(host='0.0.0.0',debug=True, port=8050)
+        for wtype in wordtypes:
+            while wtype in poem:
+                wchoice=weighted_random(wordlist[wtype])
+                if wchoice is None:
+                    poem=poem.replace(wtype,"Oh",1) #because we've found a place for interjections. GRR
+                else:
+                    poem=poem.replace(wtype,wchoice,1)
+        return 'Output: {}'.format(poem)'''
+    @app.callback(Output('group-dropdown', 'options'),[Input('Groupby-select', 'value')])
+    def update_date_dropdown(name):
+        newdf = df[~df[name].isnull()]
+        return [{'label': i, 'value': i} for i in newdf[name].unique()]
+    @app.callback(Output('filterTextOut', component_property='children'),[Input('Column-select','value'),Input('WordType','value'),Input('group-dropdown', 'value'),Input('Groupby-select', 'value'),])
+    def update_keywordsbygroup(Column,Type,name,group):
+        newdf = df[~df[Column].isnull()] #filter out empty rows
+        newdf=newdf[df[group]==name]
+        newdf[Column] = preprocess(newdf[Column]) #clean text up a bit
+        wordlist=parralelproc([Type],newdf[Column],createWordList)#create our wordlist
+        totals=defaultdict(int)
+        for (word,score) in wordlist[Type]:
+            totals[word]=totals.get(word,0)+score
+    
+        return 'Output: {}'.format(sorted(totals.items(), key=lambda t: t[1], reverse=True)[:10]) 
+        return [{'label': i, 'value': i} for i in newdf[name].unique()]
+
+
+    app.run_server(host='0.0.0.0',debug=False, port=8050)
+
 
 if __name__=="__main__":
     main()
