@@ -13,7 +13,18 @@ import chart_studio.plotly as py
 from multiprocessing.pool import ThreadPool as Pool
 from spacy.lang.en.stop_words import STOP_WORDS
 from flask import Flask, render_template, send_file
-app=Flask(__name__)
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
+from dash.dependencies import Input, Output
+
+
+app = dash.Dash(__name__)
+server = app.server
+
+
+
+
 nlp = spacy.load('en_core_web_sm')
 
 def weighted_random(pairs):
@@ -262,21 +273,22 @@ def CreateGraph2(df):
         b=random.randint(0,255)
         Traces[age]=go.Box(
             y=df.loc[df['Age group'] == age]['polarity'],
-            name = 'age',
+            name = age,
             marker = dict(
                 color = ''.join(['rgb(',str(r),", ", str(g), ", ", str(b),' )'])
             )
         )
-    
-    data = list(Traces.values())
+    Figures=OrderedDict(sorted(Traces.items(), key=lambda t: int(t[0][:2]), reverse=True))
+
+    data = list(Figures.values())
     layout = go.Layout(
         title = "Sentiment by age group"
     )
     fig = go.Figure(data=data,layout=layout)
     #img=BytesIO(fig.to_image())
     #img.seek(0)
-    return py.plot(fig, filename='2dhistogram-2d-density-plot-subplots')
 
+    return fig
 wordtypes=["ADJ","ABSTNOUN","INTRANVERB","TRANVERB","INTJ","ADV","PRPN","VERB","NOUN"]
 wordlist={wtype:list() for wtype in wordtypes}
 def createWordList(df):
@@ -344,14 +356,22 @@ def main():
     df['polarity'] = df[desiredkey].map(lambda text: TextBlob(text).sentiment.polarity) # lets make a single polarity value using textblob
     df['review_len'] = df[desiredkey].astype(str).apply(len)
     df['word_count'] = df[desiredkey].apply(lambda x: len(str(x).split()))
-    CreateGraph2(df)
+    fig=CreateGraph2(df)
     for word,score in wordlist['ADJ']:
         totals[word]=totals.get(word,0)+score
     totals=OrderedDict(sorted(totals.items(), key=lambda t: t[1], reverse=True))
-    @app.route('/')
-    def index():
+    AgeGroups=df['Age group'].unique()
+
+    app.layout = html.Div([  #can convert this to list graph functions 
+        html.Div([dcc.Dropdown(id='Function-select', options=[{'label': age, 'value': age} for age in AgeGroups], value='TOR', style={'width': '140px'})]),
+        dcc.Graph('Boxplot-graph', config={'displayModeBar': False})
+        ])
+
+    @app.callback(Output('Boxplot-graph', 'figure'),[Input('Function-select', 'value')])
+    def update_graph(input):
         return CreateGraph2(df)
-    app.run(debug=True)
+
+    app.run_server(host='0.0.0.0',debug=True, port=8050)
 
 if __name__=="__main__":
     main()
