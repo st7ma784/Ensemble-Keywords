@@ -1,8 +1,8 @@
-import csv,os,random,spacy
+import csv,os,random,spacy, datetime,dash, itertools, base64
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from collections import OrderedDict,defaultdict
 import numpy as np
-from io import BytesIO
+from io import BytesIO,StringIO
 from bokeh.plotting import figure, output_file, show
 import plotly.graph_objects as go
 from chart_studio.plotly import plot,iplot
@@ -13,13 +13,12 @@ import chart_studio.plotly as py
 from multiprocessing.pool import ThreadPool as Pool
 from spacy.lang.en.stop_words import STOP_WORDS
 from flask import Flask, render_template, send_file
-import dash
 import dash_core_components as dcc
 import dash_html_components as html
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 from functools import partial
 from itertools import repeat
-import itertools
+DEBUG=True
 nlp = spacy.load('en_core_web_sm')
 
 wordtypes=["ADJ","ABSTNOUN","INTRANVERB","TRANVERB","INTJ","ADV","PRPN","VERB","NOUN"]
@@ -38,7 +37,12 @@ sentences=["The ADJ NOUN ADV TRANVERBs the NOUN.",
 "All NOUNs TRANVERB ADJ, ADJ NOUN.",
 "Never TRANVERB a NOUN.",
 ]
-
+df=None
+TextFields=[10,12,13,14,15,17,19,20,21,27] # if unique values greater than  15? or max len? 
+TextFields=[]
+GroupFields=['Age group','Postcode / Zip','Country','Gender'] # these can be made with defining unique() values < 15
+GroupFields=[]
+keys=[]
 def weighted_random(pairs):
     total = sum(pair[1] for pair in pairs)
     r = random.uniform(0, total)
@@ -46,6 +50,47 @@ def weighted_random(pairs):
         r -= weight
         if r <= 0: return name
 
+def parse_contents(contents, filename, date):
+    global df,TextFields,GroupFields,keys
+    content_type, content_string = contents.split(',')
+
+    decoded = base64.b64decode(content_string)
+    try:
+        if 'csv' in filename:
+            # Assume that the user uploaded a CSV file
+            df = pd.read_csv(StringIO(decoded.decode('utf-8')))
+        elif 'xls' in filename:
+            # Assume that the user uploaded an excel file
+            df = pd.read_excel(BytesIO(decoded))
+        
+    except Exception as e:
+        print(e)
+        return html.Div([
+            'There was an error processing this file.'
+        ])
+    returnlist=[html.H5(filename),html.H6(datetime.datetime.fromtimestamp(date)),]
+    if DEBUG:
+        returnlist=returnlist.extend([
+            html.Hr(),  # horizontal line
+            html.Div('Raw Content'),
+            html.Pre(contents[0:200] + '...', style={
+                'whiteSpace': 'pre-wrap',
+                'wordBreak': 'break-all'
+            })
+        ])
+    return html.Div(returnlist)
+def extractdf(contents,filename):
+    #print(contents)
+    content_type, content_string = contents.split(',')
+
+    decoded = base64.b64decode(content_string)
+
+    if 'csv' in filename:
+        # Assume that the user uploaded a CSV file
+        return pd.read_csv(StringIO(decoded.decode('utf-8')),header=0)
+    elif 'xls' in filename:
+        # Assume that the user uploaded an excel file
+        return pd.read_excel(BytesIO(decoded),header=0)
 
 class TextRank4Keyword():
     """Extract keywords from text"""
@@ -278,35 +323,20 @@ def main():
     server = app.server
     sid=SentimentIntensityAnalyzer()
     Filename=os.path.join("DATA","DataoftheHeart_LakeDistrictsurvey.csv")
-    #with open(Filename, mode='r') as infile:
-    #    reader = list(csv.DictReader(infile))
-    #    desiredkey=list(reader[0].keys())[17]
-    #print("From: "+desiredkey)
-    df = pd.read_csv(Filename) # open file
-    #df = df[~df[desiredkey].isnull()] #filter out empty rows
-    #df[desiredkey] = preprocess(df[desiredkey]) #clean text up a bit
-    #parralelproc(df[desiredkey],createWordList)#create our wordlist
-    #print(wordlist)
-    #    polaritykeys=sid.polarity_scores("").keys()
-    #for key in polaritykeys:
-    #    df[key]=df[desiredkey].map(lambda text: sid.polarity_scores(text)[key]) # create rows for sentiment [pos, nue, neg, compound]
-    #    print(key + " score for column : " + str(sum(df[key])))  # lets just sanity check those scores. 
-    #df['polarity'] = df[desiredkey].map(lambda text: TextBlob(text).sentiment.polarity) # lets make a single polarity value using textblob
-    
-    #df['review_len'] = df[desiredkey].astype(str).apply(len)
-    #df['word_count'] = df[desiredkey].apply(lambda x: len(str(x).split()))
-    keys=list(df.keys())
-    #AgeGroups=df['Age group'].unique()
+    #df = pd.read_csv(Filename) # open file
+    #keys=list(df.keys())
     Functions={"polarity":polarity}
     TextFields=[10,12,13,14,15,17,19,20,21,27]
     GroupFields=['Age group','Postcode / Zip','Country','Gender']
-    app.layout = html.Div([        
+    app.layout = html.Div([    
+        dcc.Upload(id='upload-data',children=html.Div(['Drag and Drop or ',html.A('Select Files')]),style={'width': '100%', 'border':'1px'},),    
+        html.Div(id='output-data-upload'),
         html.P('Graph Types:'),
         dcc.Dropdown(id='Function-select', options=[{'label': function, 'value': function} for function in Functions],style={'width': '100\%'}),
         html.P('Text entries to process:'),
-        dcc.Dropdown(id='Column-select', options=[{'label': keys[key], 'value': keys[key]} for key in TextFields],style={'width': '100\%'}),
+        dcc.Dropdown(id='Column-select',style={'width': '100\%'}),
         html.P('Grouped By'),
-        dcc.Dropdown(id='Groupby-select', options=[{'label': Group, 'value': Group} for Group in GroupFields], style={'width': '100\%'}),
+        dcc.Dropdown(id='Groupby-select',  style={'width': '100\%'}),
         dcc.Graph('Boxplot-graph', config={'displayModeBar': False}),
         html.P('find common words of type:'),
         dcc.Dropdown(id='WordType', options=[{'label': WordType, 'value': WordType} for WordType in wordlist], style={'width': '100\%'}),
@@ -317,15 +347,34 @@ def main():
         html.Div(id='filterTextOut'),
         html.P('Here\'s a poem generated with responses in this column'),
         html.Div(id='PoemOut'),
+        # Hidden div inside the app that stores the dataset
+        html.Div(id='intermediate-value', style={'display': 'none'})
     ])
+    
 
-    @app.callback(Output('Boxplot-graph', 'figure'),[Input('Function-select', 'value'),Input('Column-select','value'),Input('Groupby-select','value')])
-    def update_graph(Function,Column,Group):
+    @app.callback([Output('output-data-upload', 'children'),Output('Column-select', 'options'),Output('Groupby-select', 'options'),Output('intermediate-value', 'children'),],[Input('upload-data', 'contents')],[State('upload-data', 'filename'),State('upload-data', 'last_modified')])
+    def update_output(list_of_contents, list_of_names, list_of_dates):
+        if list_of_contents is not None:
+            children = parse_contents(list_of_contents, list_of_names, list_of_dates)
+        df=extractdf(list_of_contents, list_of_names)
+        keys=list(df.keys())
+        print(keys)
+        TextFields=filter(lambda x:df[x].map(lambda x: len(str(x))).max()>100, keys)
+        GroupFields=filter(lambda x:len(df[x].unique())<15,keys)
+        Texts=[{'label': key, 'value': key} for key in TextFields]
+        Groups=[{'label': Group, 'value': Group} for Group in GroupFields]
+        df=df.to_json(date_format='iso', orient='split')
+        return children,Texts,Groups,df
+
+    @app.callback(Output('Boxplot-graph', 'figure'),[Input('Function-select', 'value'),Input('Column-select','value'),Input('Groupby-select','value'),Input('intermediate-value', 'children')])
+    def update_graph(Function,Column,Group,jsondf):
+        df = pd.read_json(jsondf, orient='split')
         newdf = df[~df[Column].isnull()] #filter out empty rows
         newdf[Column] = preprocess(newdf[Column]) #clean text up a bit
         return globals()[Function](newdf,Column,Group)
-    @app.callback(Output('TextOut', component_property='children'),[Input('Column-select','value'),Input('WordType','value')])
-    def update_keywords(Column,Type):
+    @app.callback(Output('TextOut', component_property='children'),[Input('Column-select','value'),Input('WordType','value'),Input('intermediate-value', 'children')])
+    def update_keywords(Column,Type,jsondf):
+        df = pd.read_json(jsondf, orient='split')
         newdf = df[~df[Column].isnull()] #filter out empty rows
         newdf[Column] = preprocess(newdf[Column]) #clean text up a bit
         wordlist=parralelproc([Type],newdf[Column],createWordList)#create our wordlist
@@ -334,8 +383,9 @@ def main():
             totals[word]=totals.get(word,0)+score
     
         return 'Output: {}'.format(sorted(totals.items(), key=lambda t: t[1], reverse=True)[:10]) 
-    @app.callback(Output('PoemOut', component_property='children'),[Input('Column-select','value')])
-    def update_poem(Column):
+    @app.callback(Output('PoemOut', component_property='children'),[Input('Column-select','value'),Input('intermediate-value', 'children')])
+    def update_poem(Column,jsondf):
+        df = pd.read_json(jsondf, orient='split')
         poem="\n".join(random.sample(sentences,10))
         newdf = df[~df[Column].isnull()] #filter out empty rows
         newdf[Column] = preprocess(newdf[Column]) 
@@ -349,12 +399,14 @@ def main():
                 else:
                     poem=poem.replace(wtype,wchoice,1)
         return 'Output: {}'.format(poem)
-    @app.callback(Output('group-dropdown', 'options'),[Input('Groupby-select', 'value')])
-    def update_date_dropdown(name):
+    @app.callback(Output('group-dropdown', 'options'),[Input('Groupby-select', 'value'),Input('intermediate-value', 'children')])
+    def update_date_dropdown(name,jsondf):
+        df = pd.read_json(jsondf, orient='split')
         newdf = df[~df[name].isnull()]
         return [{'label': i, 'value': i} for i in newdf[name].unique()]
-    @app.callback(Output('filterTextOut', component_property='children'),[Input('Column-select','value'),Input('WordType','value'),Input('group-dropdown', 'value'),Input('Groupby-select', 'value'),])
-    def update_keywordsbygroup(Column,Type,name,group):
+    @app.callback(Output('filterTextOut', component_property='children'),[Input('Column-select','value'),Input('WordType','value'),Input('group-dropdown', 'value'),Input('Groupby-select', 'value'),Input('intermediate-value', 'children')])
+    def update_keywordsbygroup(Column,Type,name,group,jsondf):
+        df = pd.read_json(jsondf, orient='split')
         newdf = df[~df[Column].isnull()] #filter out empty rows
         newdf=newdf[newdf[group]==name]
         newdf[Column] = preprocess(newdf[Column]) #clean text up a bit
@@ -367,7 +419,7 @@ def main():
         return [{'label': i, 'value': i} for i in newdf[name].unique()]
 
 
-    app.run_server(host='0.0.0.0',debug=True, port=8050)
+    app.run_server(host='0.0.0.0',debug=DEBUG, port=8050)
 
 
 if __name__=="__main__":
