@@ -10,11 +10,14 @@ EXPOSE 8085
 COPY --from=builder /install /usr/local
 RUN python -m spacy download en_core_web_sm
 
-COPY setup.py .
-RUN python setup.py
-COPY ./DATA /app/DATA
-COPY Full.py /app
+
 WORKDIR /app
+COPY __init__.py .
+RUN python __init__.py
+COPY ./APPS ./APPS
+COPY ./UTILS ./UTILS
+COPY App.py .
+
 
 # Run the specified command within the container.
-CMD [ "python", "Full.py"]
+CMD [ "python", "App.py"]
