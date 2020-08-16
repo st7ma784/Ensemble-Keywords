@@ -1,4 +1,4 @@
-from textblob import TextBlob
+import gensim
 from collections import OrderedDict,defaultdict
 from bokeh.plotting import figure, output_file, show
 import plotly.graph_objects as go
@@ -6,13 +6,16 @@ from chart_studio.plotly import plot,iplot
 import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output, State
-from textblob import TextBlob
 import pandas as pd
 import numpy as np
 import chart_studio.plotly as py
 import random
 from App import app
 def sentiment(df,Column=None,Group=None):
+    #load gensim model
+    #FOR GRP IN GROUP
+    #   for item in granularity of respone
+    #       plot similarity
     if Column=='*':
         TextFields=filter(lambda x:df[x].map(lambda x: len(str(x))).max()>100, df)
         df['polarity'] = df[TextFields].map(lambda text: TextBlob(text).sentiment.polarity)
@@ -45,7 +48,7 @@ def sentiment(df,Column=None,Group=None):
 
     data = list(Figures.values())
     layout = go.Layout(
-        title = "Sentiment by group"
+        title = "Sentiment compared to input string"
     )
     fig = go.Figure(data=data,layout=layout)
     return fig
@@ -63,5 +66,6 @@ def run(df):
         dcc.Dropdown(id='sentimentgroup-select',options=Groups,style={'width': '100\%'}),
         dcc.Graph('sentimentgraph', config={'displayModeBar': False}),
     ]
-
+    #need to take input string
+    #need to pull in granularity [paragraph, sentence, word]
     return html.Div(OutPut)
