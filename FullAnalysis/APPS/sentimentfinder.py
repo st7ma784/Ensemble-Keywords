@@ -18,7 +18,7 @@ from App import app
 #model=api.load("/app/UTILS/model/model.gz")
 model=KeyedVectors.load_word2vec_format(datapath("/app/UTILS/model/model.gz"), binary=False)
 def Sentence(text,Text):
-    return np.array(map(lambda i: model.wmdistance(i.lower(),Text.lower()), gensim.summarization.textcleaner.split_sentences(text)))
+    return map(lambda i: model.wmdistance(i.lower(),Text.lower()), gensim.summarization.textcleaner.split_sentences(text))
 def Response(text,Text):
     return model.wmdistance(text.lower(),Text.lower())
 def Word(text,Text):
@@ -29,7 +29,7 @@ def sentiment(df,Column,Group, Granularity,Text):
         newdf=df
     else:
         newdf = df[~df[Column].isnull()] #filter out empty rows
-    df[Granularity] = df[Column].map(lambda text: globals()[Granularity](text,Text))
+    df[Granularity] = df[Column].map(lambda text: locals()[Granularity](text,Text))
     
     Traces={}
     if Group != 'None':

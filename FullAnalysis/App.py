@@ -122,7 +122,7 @@ def main():
     #<<<<<< ---------------- SENTIMENT CALLBACKS ------------------->>>>>>>>>>>
 
 
-    @app.callback(Output('sentimentgraph', 'figure'),[Input('sentimenttextarea-button','value')],[State('sentimenttext-select','value'),State('sentimentgroup-select','value'),State('intermediate-value', 'children'),State('sentimentgranularity-select','value'),State('sentimentext-entry', 'value')])
+    @app.callback(Output('sentimentgraph', 'figure'),[Input('sentimenttextarea-button','n_clicks')],[State('sentimenttext-select','value'),State('sentimentgroup-select','value'),State('intermediate-value', 'children'),State('sentimentgranularity-select','value'),State('sentimentext-entry', 'value')])
     def drawpolaritygraph(_,Column,Group,jsondf,Granularity,Text):
         df = pd.read_json(jsondf, orient='split')
         mod = importlib.import_module("APPS.sentimentfinder")
