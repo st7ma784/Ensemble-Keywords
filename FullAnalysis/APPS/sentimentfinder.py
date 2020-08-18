@@ -11,16 +11,19 @@ import numpy as np
 import chart_studio.plotly as py
 import random
 import gensim.downloader as api
+from gensim.models import Word2Vec,KeyedVectors
+from gensim.test.utils import datapath
 from App import app
 
-model=api.load(path="/app/model/model.wv")
+#model=api.load("/app/UTILS/model/model.gz")
+model=KeyedVectors.load_word2vec_format(datapath("/app/UTILS/model/model.gz"), binary=False)
 def Sentence(text,Text):
     return np.array(map(lambda i: model.wmdistance(i.lower(),Text.lower()), gensim.summarization.textcleaner.split_sentences(text)))
 def Response(text,Text):
     return model.wmdistance(text.lower(),Text.lower())
 def Word(text,Text):
     return model.wv.n_similarity(text.lower().split(), Text.lower().split())
-def sentiment(df,Column=None,Group, Granularity="Response",Text):
+def sentiment(df,Column,Group, Granularity,Text):
     if Column=='*':
         Column=filter(lambda x:df[x].map(lambda x: len(str(x))).max()>100, df)
         newdf=df
@@ -44,7 +47,7 @@ def sentiment(df,Column=None,Group, Granularity="Response",Text):
                 )
             )
     Traces["all"]=go.Box(
-                y=df['polarity'],
+                y=df[Granularity],
                 name = "All",
                 marker = dict(
                     color = ''.join(['rgb(',str(random.randint(0,255)),", ", str(random.randint(0,255)), ", ", str(random.randint(0,255)),' )'])
@@ -73,17 +76,18 @@ def run(df):
         dcc.Dropdown(id='sentimenttext-select',options=Texts,style={'width': '100\%'}),
         html.P('Grouped By'),
         dcc.Dropdown(id='sentimentgroup-select',options=Groups,style={'width': '100\%'}),
-        html.P('Sentiment to compare to')
+        html.P('Similarity comparison of '),
+        dcc.Dropdown(id='sentimentgranularity-select',options=Options,style={'width': '100\%'}),
+        html.P('Sentiment to compare to'),
         dcc.Textarea(
             id='sentimentext-entry',
             placeholder='Enter a value...',
-            type='text',
-            value='There is much hope for the future'
-        )  
+            value='There is much hope for the future',
+        ),
         html.Button('Submit', id='sentimenttextarea-button', n_clicks=0),
-        html.P('Similarity comparison of '),
-        dcc.Dropdown(id='sentimentgranularity-select',options=Options,style={'width': '100\%'}),
+        
         dcc.Graph('sentimentgraph', config={'displayModeBar': False}),
+
     ]
     #need to take input string
     #need to pull in granularity [paragraph, sentence, word]
