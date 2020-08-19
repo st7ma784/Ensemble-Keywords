@@ -1,14 +1,7 @@
 version: '2.2'
-
 services:
     fullanaysis:
         container_name: full
         build: FullAnalysis
         ports:
             - 8050:8050
-        volumes:
-            - /etc/group:/etc/group:ro
-            - /etc/passwd:/etc/passwd:ro
-            - /etc/shadow:/etc/shadow:ro
-            - /etc/sudoers.d:/etc/sudoers.d:ro
-            - /tmp/.X11-unix:/tmp/.X11-unix:rw 

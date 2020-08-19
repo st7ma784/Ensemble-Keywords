@@ -130,6 +130,17 @@ def main():
 
         return sentiment(df,Column,Group,Granularity,Text)
 
+
+
+    #<<<<<< ---------------- GRAPH RESPONSES CALLBACK ----------------->>>>>>>>>>>    
+
+    @app.callback(Output('distancegraph', 'figure'),[Input('Distancetext-select','value'),Input('distance-slider','value'),Input('intermediate-value', 'children')])
+    def drawpolaritygraph(Column,threshold,jsondf):
+        df = pd.read_json(jsondf, orient='split')
+        mod = importlib.import_module("APPS.visualizedistance")
+        sentiment = getattr(mod, "visualizedistance")
+        return visualizedistance(df,Column,threshold)
+    
     #<<<<<< ---------------- RUN  ------------------->>>>>>>>>>>
 
 

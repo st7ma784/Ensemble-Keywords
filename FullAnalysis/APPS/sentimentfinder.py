@@ -14,22 +14,29 @@ import gensim.downloader as api
 from gensim.models import Word2Vec,KeyedVectors
 from gensim.test.utils import datapath
 from App import app
+from gensim.models import doc2vec
 
-#model=api.load("/app/UTILS/model/model.gz")
+'''
+from gensim.models import Sent2Vec
+sents = Sent2Vec(common_texts, size=100, min_count=1)'''
 model=KeyedVectors.load_word2vec_format(datapath("/app/UTILS/model/model.gz"), binary=False)
+docmodel=Doc2Vec.load("/app/UTILS/model/sentsmodel.bin")                    
 def Sentence(text,Text):
     return map(lambda i: model.wmdistance(i.lower(),Text.lower()), gensim.summarization.textcleaner.split_sentences(text))
+    #could use summarize and then word sim? or combine with Keywords 
 def Response(text,Text):
     return model.wmdistance(text.lower(),Text.lower())
 def Word(text,Text):
     return model.wv.n_similarity(text.lower().split(), Text.lower().split())
+
+
 def sentiment(df,Column,Group, Granularity,Text):
     if Column=='*':
         Column=filter(lambda x:df[x].map(lambda x: len(str(x))).max()>100, df)
-        newdf=df
-    else:
-        newdf = df[~df[Column].isnull()] #filter out empty rows
-    df[Granularity] = df[Column].map(lambda text: locals()[Granularity](text,Text))
+ 
+   
+    newdf = df[~df[Column].isnull()] #filter out empty rows
+    df[Granularity] = df[Column].map(lambda text: globals()[Granularity](str(text).lower(),str(Text).lower()))
     
     Traces={}
     if Group != 'None':
