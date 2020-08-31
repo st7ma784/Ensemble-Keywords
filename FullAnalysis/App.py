@@ -29,13 +29,13 @@ def main():
 
     server = app.server
     sid=SentimentIntensityAnalyzer()
-    Filename=os.path.join("DATA","DataoftheHeart_LakeDistrictsurvey.csv")
+    #Filename=os.path.join("DATA","DataoftheHeart_LakeDistrictsurvey.csv")
     #df = pd.read_csv(Filename) # open file
     #keys=list(df.keys())
     Funcs=filter(lambda x: x.endswith(".py"), [file for file in os.listdir("./APPS")])
     Funcs=map(lambda x: x[:-3],Funcs)
-    TextFields=[10,12,13,14,15,17,19,20,21,27]
-    GroupFields=['Age group','Postcode / Zip','Country','Gender']
+    #TextFields=[10,12,13,14,15,17,19,20,21,27]
+    #GroupFields=['Age group','Postcode / Zip','Country','Gender']
     app.layout = html.Div([    
         dcc.Upload(id='upload-data',children=html.Div(['Drag and Drop or ',html.A('Select Files')]),style={'width': '100%', 'border':'1px'},),    
         html.Div(id='output-data-upload'),
@@ -80,14 +80,16 @@ def main():
             newdf = df[~df[name].isnull()]
             options+=list(newdf[name].unique())
         return [{'label': i, 'value': i} for i in options]
-    
+   
+
     #give back a poem based on out picked group
-    @app.callback(Output('PoemOut', 'children'),[Input('wordranktext-select','value'),Input('intermediate-value', 'children')])
-    def updatepoem(Column,jsondf):
+    @app.callback(Output('PoemOut', 'children'),[Input('wordranktext-select','value'),Input('intermediate-value', 'children'),Input('upload-poem-template', 'contents')],[State('upload-poem-template', 'filename')])
+    def updatepoem(Column,jsondf,list_of_contents, list_of_names):
+        poem=readtextfile(list_of_contents, list_of_names)
         newdf = pd.read_json(jsondf, orient='split')
         mod = importlib.import_module("APPS.wordrank")
         wordrank = getattr(mod, "wordrankpoem")
-        return wordrank(newdf,Column)
+        return wordrank(newdf,Column,poem)
 
     #find preferred word type of given subgroup of group
     @app.callback(Output('filterTextOut', component_property='children'),[Input('wordranktext-select','value'),Input('wordrankwordtype','value'),Input('wordrankgroup-dropdown', 'value'),Input('wordrankgroup-select', 'value'),Input('intermediate-value', 'children')])

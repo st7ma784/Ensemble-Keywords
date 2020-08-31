@@ -78,7 +78,7 @@ class TextRank4Keyword():
                         selected_words.append(text)
             sentences.append(selected_words)
         return sentences
-        
+    
     def get_vocab(self, sentences):
         """Get all tokens"""
         vocab = OrderedDict()
@@ -124,7 +124,23 @@ class TextRank4Keyword():
         
         return g_norm
 
-    
+    def reversetemplate(poem):
+        sentences = []
+        for sent in poem.sents:
+            selected_words = []
+            for token in sent:
+                pos=self.check_verb(token)
+                if (pos in candidate_pos or token.tag_ in candidate_pos):
+
+                    text=token.tag_    
+                    selected_words.append(text.upper())
+                else:
+                    text=token.text
+                    selected_words.append(text.lower())
+
+            sentences.append(selected_words)
+        return sentences
+
     def get_keywords(self, number=10):
         """Print top number keywords"""
         node_weight = OrderedDict(sorted(self.node_weight.items(), key=lambda t: t[1], reverse=True))
@@ -174,8 +190,11 @@ class TextRank4Keyword():
         
         self.node_weight = node_weight
 
-
-
+def buildTemplateFromText(rawpoem):
+    poem=preprocess(rawpoem)
+    tr4w=TextRank4Keyword()
+    template=tr4w.reversetemplate(nlp(poem))
+    return template
 def parralelproc(params,df,func,n_cores=os.cpu_count()):
     #print(params)
     results=[]
@@ -250,7 +269,16 @@ def parse_contents(contents, filename, date):
             })
         ])
     return html.Div(returnlist)
-
+def readtextfile(contents, filename):
+    if contents is not None:
+        content_type, content_string = contents.split(',')
+        
+        decoded = base64.b64decode(content_string)
+        TEXT = StringIO(decoded.decode('utf-8')).read()
+        TEXT=buildTemplateFromText(TEXT)
+    else:
+        TEXT="None"
+    return TEXT
 def createWordList(df,param):
     tr4w = TextRank4Keyword()
     toprankslist=list(df.apply(lambda x:TextRankAnalyse(tr4w,x,param)))

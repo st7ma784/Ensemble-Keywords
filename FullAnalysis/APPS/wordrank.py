@@ -30,11 +30,14 @@ sentences=["The ADJ NOUN ADV TRANVERBs the NOUN.",
 "Never TRANVERB a NOUN.",
 ]
 
-def wordrankpoem(newdf,Column):
+
+
+def wordrankpoem(newdf,Column,poem):
     if Column=="*":
             Column=list(filter(lambda x:newdf[x].map(lambda x: len(str(x))).max()>100, newdf))
     newdf = newdf[~newdf[Column].isnull()] #filter out empty rows
-    poem="\n".join(random.sample(sentences,10))
+    if poem=="None":
+        poem="\n".join(random.sample(sentences,10))
     wordlist=parralelproc(wordtypes,newdf[Column],createWordList)#create our wordlist
     for wtype in wordtypes:
         while wtype in poem:
@@ -71,11 +74,13 @@ def run(df):
         html.P('Grouped By'),
         dcc.Dropdown(id='wordrankgroup-select',options=Groups,style={'width': '100\%'}),
         html.P('Word Type'),
-
         dcc.Dropdown(id='wordrankwordtype',options=Wordtypes,style={'width': '100\%'}),    
         html.P('view most common words across by group:'),
         dcc.Dropdown(id='wordrankgroup-dropdown',style={'width': '100\%'}),
+           
         html.Div(id='filterTextOut'),
+        dcc.Upload(id='upload-poem-template',children=html.Div(['Drag and Drop or ',html.A('Select Files')]),style={'width': '100%', 'border':'1px'},),    
+
         html.P('Here\'s a poem generated with responses in this column'),
         html.Div(id='PoemOut'),
     ]
