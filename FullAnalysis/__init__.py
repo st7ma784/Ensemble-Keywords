@@ -19,9 +19,11 @@ from gensim.models import doc2vec
 from collections import namedtuple
 
 # Load data
-from gensim.test.utils import common_texts
+from gensim.test.utils import common_texts,common_corpus
+from gensim.models.doc2vec import Doc2Vec, TaggedDocument
+documents = [TaggedDocument(doc, [i]) for i, doc in enumerate(common_texts)]
 
 # Train model (set min_count = 1, if you want the model to work with the provided example data set)
 filename="sentsmodel.bin"
-model = doc2vec.Doc2Vec(common_texts, size = 100, window = 300, min_count = 1, workers = 4)
+model = doc2vec.Doc2Vec(documents, size = 100, window = 300, min_count = 1, workers = 4)
 model.save(os.path.join(path,filename))
