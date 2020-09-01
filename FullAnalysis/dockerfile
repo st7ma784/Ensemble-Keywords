@@ -5,7 +5,7 @@ WORKDIR /install
 COPY requirements.txt /requirements.txt
 RUN pip install -U --no-cache-dir --prefix="/install" -r /requirements.txt
 FROM base
-EXPOSE 8085
+EXPOSE 8050
 #bring basic tools across
 COPY --from=builder /install /usr/local
 RUN python -m spacy download en_core_web_sm

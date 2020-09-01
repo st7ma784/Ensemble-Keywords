@@ -24,7 +24,7 @@ sentences=["The ADJ NOUN ADV TRANVERBs the NOUN.",
 "NOUNs INTRANVERB like ADJ NOUN.",
 "Why does the NOUN INTRANVERB?",
 "INTRANVERB ADV like a ADJ NOUN.",
-"ABSTNOUN, ABSTNOUN, and ABSTNOUN.",
+"ABSTNOUN, ABSTNOUN, and ABSTNOUN",
 "Where is the ADJ NOUN?",
 "All NOUNs TRANVERB ADJ, ADJ NOUN.",
 "Never TRANVERB a NOUN.",
@@ -37,7 +37,8 @@ def wordrankpoem(newdf,Column,poem):
             Column=list(filter(lambda x:newdf[x].map(lambda x: len(str(x))).max()>100, newdf))
     newdf = newdf[~newdf[Column].isnull()] #filter out empty rows
     if poem=="None":
-        poem="\n".join(random.sample(sentences,10))
+        poem=random.sample(sentences,10)
+        poem="\n".join(poem)
     wordlist=parralelproc(wordtypes,newdf[Column],createWordList)#create our wordlist
     for wtype in wordtypes:
         while wtype in poem:

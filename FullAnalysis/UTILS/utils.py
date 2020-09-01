@@ -25,6 +25,7 @@ class TextRank4Keyword():
         self.node_weight = None # save keywords and its weight
         with open(os.path.join("UTILS","DATA",'abstractnounlist.txt'),'r') as file:
             ABST=file.readlines()
+        self.wordtypes=["ADJ","ABSTNOUN","INTRANVERB","TRANVERB","INTJ","ADV","PRPN","VERB","NOUN"]
         self.ABSTLIST=[word.lower().replace("\n","") for word in ABST]
         #print(self.ABSTLIST)
     
@@ -124,22 +125,23 @@ class TextRank4Keyword():
         
         return g_norm
 
-    def reversetemplate(poem):
+    def reversetemplate(self,poem):
         sentences = []
         for sent in poem.sents:
             selected_words = []
             for token in sent:
                 pos=self.check_verb(token)
-                if (pos in candidate_pos or token.tag_ in candidate_pos):
+                if pos in self.wordtypes:
 
-                    text=token.tag_    
+                    text=pos 
                     selected_words.append(text.upper())
                 else:
                     text=token.text
-                    selected_words.append(text.lower())
+                    if len(text)>1 or text=="a" or text=="I": 
+                        selected_words.append(text.lower())
 
-            sentences.append(selected_words)
-        return sentences
+            sentences.append(" ".join(selected_words))
+        return "\n".join(sentences)
 
     def get_keywords(self, number=10):
         """Print top number keywords"""
@@ -191,7 +193,11 @@ class TextRank4Keyword():
         self.node_weight = node_weight
 
 def buildTemplateFromText(rawpoem):
-    poem=preprocess(rawpoem)
+    poem=rawpoem.replace('(<a).*(>).*(</a>)', '')
+    # poem = poem.replace('(&amp)', '')
+    # poem = poem.replace('(&gt)', '')
+    # poem = poem.replace('(&lt)', '')
+    # poem = poem.replace('(\xa0)', ' ') 
     tr4w=TextRank4Keyword()
     template=tr4w.reversetemplate(nlp(poem))
     return template
@@ -272,9 +278,8 @@ def parse_contents(contents, filename, date):
 def readtextfile(contents, filename):
     if contents is not None:
         content_type, content_string = contents.split(',')
-        
         decoded = base64.b64decode(content_string)
-        TEXT = StringIO(decoded.decode('utf-8')).read()
+        TEXT = "\n".join(StringIO(decoded.decode('utf-8')).read())
         TEXT=buildTemplateFromText(TEXT)
     else:
         TEXT="None"
