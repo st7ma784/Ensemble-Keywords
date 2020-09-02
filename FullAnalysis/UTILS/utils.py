@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import csv,os,random, datetime,dash, itertools, base64
 from collections import OrderedDict,defaultdict
 import numpy as np
@@ -8,6 +10,19 @@ import dash_core_components as dcc
 import dash_html_components as html
 from functools import partial
 from itertools import repeat
+import math
+import numpy
+import spacy
+import tqdm
+
+import tensorflow as tf
+from tensorboard.plugins import projector
+
+from tensorboard.plugins.projector import (
+    visualize_embeddings,
+    ProjectorConfig,
+)
+
 DEBUG=False
 
 import spacy,os
@@ -27,6 +42,7 @@ class TextRank4Keyword():
             ABST=file.readlines()
         self.wordtypes=["ADJ","ABSTNOUN","INTRANVERB","TRANVERB","INTJ","ADV","PRPN","VERB","NOUN"]
         self.ABSTLIST=[word.lower().replace("\n","") for word in ABST]
+        self.knowledgebase=set()
         #print(self.ABSTLIST)
     
     def set_stopwords(self, stopwords):  
@@ -148,7 +164,46 @@ class TextRank4Keyword():
         node_weight = OrderedDict(sorted(self.node_weight.items(), key=lambda t: t[1], reverse=True))
         return list(node_weight.items())[:number]
 
-        
+    def getknowledge(self,doc):
+    
+        if "parser" not in nlp.pipe_names:
+            parser = nlp.create_pipe("parser")
+            nlp.add_pipe(parser, first=True)
+        # otherwise, get it, so we can add labels to it
+        else:
+            parser = nlp.get_pipe("parser")
+
+        print("Dependencies", [(t.text, t.dep_, t.head.text) for t in  filter(lambda w: w.dep_ in ("attr", "dobj"), doc)])
+        self.knowledgebase=set((t.text, t.dep_, t.head.text) for t in doc)
+
+        '''
+        # merge entities and noun chunks into one token
+        spans = list(doc.ents) + list(doc.noun_chunks)
+        with doc.retokenize() as retokenizer:
+            for span in spans:
+                retokenizer.merge(span)
+
+        relations = []
+        for money in filter(lambda w: w.ent_type_ == "MONEY", doc):
+            if money.dep_ in ("attr", "dobj"):
+                subject = [w for w in money.head.lefts if w.dep_ == "nsubj"]
+                if subject:
+                    subject = subject[0]
+                    relations.append((subject, money))
+            elif money.dep_ == "pobj" and money.head.dep_ == "prep":
+                relations.append((money.head.head, money))
+        return relations
+
+
+        print("Processing %d texts" % len(TEXTS))
+
+        for text in TEXTS:
+            doc = nlp(text)
+            relations = extract_currency_relations(doc)
+            for r1, r2 in relations:
+                print("{:<10}\t{}\t{}".format(r1.text, r2.ent_type_, r2.text))
+        '''
+        return set((t.text, t.dep_, t.head.text) for t in doc)
         
     def analyze(self, text, 
                 candidate_pos=['NOUN', 'PROPN'], 
@@ -166,10 +221,11 @@ class TextRank4Keyword():
         
         # Build vocabulary
         vocab = self.get_vocab(sentences)
-        
+        #createTensorBOARD from vocab??
+
+
         # Get token_pairs from windows
         token_pairs = self.get_token_pairs(window_size, sentences)
-        
         # Get normalized matrix
         g = self.get_matrix(vocab, token_pairs)
         
@@ -292,4 +348,53 @@ def createWordList(df,param):
 def TextRankAnalyse(tr4w, text,wtype):
     tr4w.analyze(text, candidate_pos = [wtype], window_size=4, lower=False)
     return tr4w.get_keywords(10)
-    
+
+def CreateTensorBoard(Strings, out_loc=".", name="spaCy_vectors"):
+    meta_file = "{}.tsv".format(name)
+    out_meta_file = os.path.join(out_loc, meta_file)
+
+    strings_stream = tqdm.tqdm(Strings, total=len(Strings), leave=False)
+    queries = [w for w in strings_stream if model.vocab.has_vector(w)]
+    vector_count = len(queries)
+
+    print(
+        "Building Tensorboard Projector metadata for ({}) vectors: {}".format(
+            vector_count, out_meta_file
+        )
+    )
+
+    tf_vectors_variable = numpy.zeros((vector_count, model.vocab.vectors.shape[1]))
+    with open(out_meta_file, "wb") as file_metadata:
+        # Define columns in the first row
+        file_metadata.write("Text\tFrequency\n".encode("utf-8"))
+        vec_index = 0
+        for text in tqdm.tqdm(queries, total=len(queries), leave=False):
+            text = "<Space>" if text.lstrip() == "" else text
+            lex = model.vocab[text]
+            tf_vectors_variable[vec_index] = model.vocab.get_vector(text)
+            file_metadata.write(
+                "{}\t{}\n".format(text, math.exp(lex.prob) * vector_count).encode(
+                    "utf-8"
+                )
+            )
+            vec_index += 1
+    print("Running Tensorflow Session...")
+    sess = tf.InteractiveSession()
+    tf.Variable(tf_vectors_variable, trainable=False, name=name)
+    tf.global_variables_initializer().run()
+    saver = tf.train.Saver()
+    writer = tf.summary.FileWriter(out_loc, sess.graph)
+
+    # Link the embeddings into the config
+    config = ProjectorConfig()
+    embed = config.embeddings.add()
+    embed.tensor_name = name
+    embed.metadata_path = meta_file
+
+    # Tell the projector about the configured embeddings and metadata file
+    visualize_embeddings(writer, config)
+
+    # Save session and print run command to the output
+    print("Saving Tensorboard Session...")
+    saver.save(sess, path.join(out_loc, "{}.ckpt".format(name)))
+    print("Done. Run `tensorboard --logdir={0}` to view in Tensorboard".format(out_loc))
