@@ -154,7 +154,7 @@ class TextRank4Keyword():
                     selected_words.append(text.upper())
                 else:
                     text=token.text
-                    if len(text)>1 or text=="a" or text=="I": 
+                    if len(text)>1 or text=="a" or text=="I" or token.tag_='punct': 
                         selected_words.append(text.lower())
 
             sentences.append(" ".join(selected_words))
@@ -265,19 +265,27 @@ def buildPoem(df,poem,metaphor=1):
     pos=nx.spring_layout(G)
     nx.draw(G, with_labels=True, pos=pos, edge_cmap=plt.cm.Blues, )
     '''
-    for sentence in poem
-        build list of consecutive tags
-        for set in list
-            find weighted random first word. 
-            find word in graph. 
-            if word is noun anmd compound
-                add next noun
-            if word is verb 
-                do i need to swap?
-            find next word
-            look for all steps in graph for next word,
-            randomly pick available paths
-            repeat for that path. 
+    poem=poem.split("\n")
+    for sentence in poem:
+        sentence=sentence.split()
+        while any(sentence) in wordtypes:
+            for i in range(len(sentence)):
+                token=sentence[i]
+                if token in wordtypes:
+                    for j in range(len(sentence)-i,0):
+                        if all(word in wordtypes for word in x[i:len(sentence)-j]):
+                            sublist=x[i:len(sentence)-j]
+                        
+                            find weighted random first word. 
+                            find word in graph. 
+                            if word is noun anmd compound
+                                add next noun
+                            if word is verb 
+                                do i need to swap?
+                            find next word
+                            look for all steps in graph for next word,
+                            randomly pick available paths
+                            repeat for that path. 
     '''
     for wtype in wordtypes:
         while wtype in poem:
