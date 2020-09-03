@@ -84,6 +84,7 @@ class TextRank4Keyword():
             selected_words = []
             for token in sent:
                 pos=self.check_verb(token)
+                #check for compound noun.
                 if (pos in candidate_pos or token.tag_ in candidate_pos) and token.is_stop is False:
 
                     text=token.text    
@@ -251,6 +252,41 @@ def buildTemplateFromText(rawpoem):
     tr4w=TextRank4Keyword()
     template=tr4w.reversetemplate(nlp(poem))
     return template
+def buildPoem(df,poem,metaphor=1):
+    wordlist=parralelproc(wordtypes,newdf[Column],createWordList)#create our wordlist
+    wordgraph=pd.DataFrame()
+    wordgraph["relations"]=buildknowledgebase(newdf[Column])
+    wordgraph["source"]=wordgraph["relations"].apply(lambda x: x[0])
+    wordgraph["target"]=wordgraph["relations"].apply(lambda x: x[2])
+    wordgraph["edgetype"]=wordgraph["relations"].apply(lambda x: x[1])
+    wordgraph.drop("relations",axis=1)
+    kg_df=pd.DataFrame({"source":wordgraph["source"],"target":wordgraph["target"],"edge":wordgraph["edgetype"]})
+    G=nx.from_pandas_edgelist(kg_df, "source", "target",edge_attr=True, create_using=nx.MultiDiGraph())
+    pos=nx.spring_layout(G)
+    nx.draw(G, with_labels=True, pos=pos, edge_cmap=plt.cm.Blues, )
+    '''
+    for sentence in poem
+        build list of consecutive tags
+        for set in list
+            find weighted random first word. 
+            find word in graph. 
+            if word is noun anmd compound
+                add next noun
+            if word is verb 
+                do i need to swap?
+            find next word
+            look for all steps in graph for next word,
+            randomly pick available paths
+            repeat for that path. 
+    '''
+    for wtype in wordtypes:
+        while wtype in poem:
+            wchoice=weighted_random(wordlist[wtype])
+            if wchoice is None:
+                poem=poem.replace(wtype,"Oh",1) #because we've found a place for interjections. GRR
+            else:
+                poem=poem.replace(wtype,wchoice,1)
+    return poem
 def parralelproc(params,df,func,n_cores=os.cpu_count()):
     #print(params)
     results=[]

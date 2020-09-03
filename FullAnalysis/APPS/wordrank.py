@@ -13,7 +13,14 @@ import chart_studio.plotly as py
 import random
 from App import app
 from UTILS.utils import * 
-wordtypes=["ADJ","ABSTNOUN","INTRANVERB","TRANVERB","INTJ","ADV","PRPN","VERB","NOUN"]
+wordlist=parralelproc(wordtypes,newdf[Column],createWordList)#create our wordlist
+    for wtype in wordtypes:
+        while wtype in poem:
+            wchoice=weighted_random(wordlist[wtype])
+            if wchoice is None:
+                poem=poem.replace(wtype,"Oh",1) #because we've found a place for interjections. GRR
+            else:
+                poem=poem.replace(wtype,wchoice,1)=["ADJ","ABSTNOUN","INTRANVERB","TRANVERB","INTJ","ADV","PRPN","VERB","NOUN"]
 wordlist={wtype:list() for wtype in wordtypes}
 sentences=["The ADJ NOUN ADV TRANVERBs the NOUN.",
 "ADJ, ADJ NOUN ADV TRANVERBs a ADJ, ADJ NOUN.",
@@ -39,25 +46,7 @@ def wordrankpoem(newdf,Column,poem):
     if poem=="None":
         poem=random.sample(sentences,10)
         poem="\n".join(poem)
-    wordgraph=pd.DataFrame()
-    wordgraph["relations"]=buildknowledgebase(newdf[Column])
-    wordgraph["source"]=wordgraph["relations"].apply(lambda x: x[0])
-    wordgraph["target"]=wordgraph["relations"].apply(lambda x: x[2])
-    wordgraph["edgetype"]=wordgraph["relations"].apply(lambda x: x[1])
-    wordgraph.drop("relations",axis=1)
-    kg_df=pd.DataFrame({"source":wordgraph["source"],"target":wordgraph["target"],"edge":wordgraph["edgetype"]})
-    G=nx.from_pandas_edgelist(kg_df, "source", "target",edge_attr=True, create_using=nx.MultiDiGraph())
-    pos=nx.spring_layout(G)
-    nx.draw(G, with_labels=True, pos=pos, edge_cmap=plt.cm.Blues, )
-    
-    wordlist=parralelproc(wordtypes,newdf[Column],createWordList)#create our wordlist
-    for wtype in wordtypes:
-        while wtype in poem:
-            wchoice=weighted_random(wordlist[wtype])
-            if wchoice is None:
-                poem=poem.replace(wtype,"Oh",1) #because we've found a place for interjections. GRR
-            else:
-                poem=poem.replace(wtype,wchoice,1)
+    poem=buildPoem(newdf[Column],poem)
     return poem
 
 def wordrankpersubgroup(Column,Type,name,group,df):
