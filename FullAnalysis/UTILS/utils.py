@@ -165,15 +165,9 @@ class TextRank4Keyword():
         return list(node_weight.items())[:number]
 
     def getknowledge(self,doc):
-    
-        if "parser" not in nlp.pipe_names:
-            parser = nlp.create_pipe("parser")
-            nlp.add_pipe(parser, first=True)
-        # otherwise, get it, so we can add labels to it
-        else:
-            parser = nlp.get_pipe("parser")
-
-        print("Dependencies", [(t.text, t.dep_, t.head.text) for t in  filter(lambda w: w.dep_ in ("attr", "dobj"), doc)])
+        print(doc.text)
+        print("Dependencies", [(t.text, t.dep_, t.head.text) for t in  filter(lambda w: w.dep_ in ("compound","amod", "dobj"), doc)])
+        print("WordTypes",[(self.check_verb(t),self.check_verb(t.head)) for t in  filter(lambda w: w.dep_ in ("compound","amod", "dobj"), doc)])
         self.knowledgebase=set((t.text, t.dep_, t.head.text) for t in doc)
 
         '''
@@ -340,6 +334,10 @@ def readtextfile(contents, filename):
     else:
         TEXT="None"
     return TEXT
+def buildknowledgebase(df):
+    tr4w = TextRank4Keyword()
+    return list(itertools.chain.from_iterable(df.apply(lambda x:tr4w.getknowledge(nlp(x)))))
+
 def createWordList(df,param):
     tr4w = TextRank4Keyword()
     toprankslist=list(df.apply(lambda x:TextRankAnalyse(tr4w,x,param)))

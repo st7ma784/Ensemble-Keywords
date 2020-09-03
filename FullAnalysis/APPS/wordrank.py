@@ -39,6 +39,17 @@ def wordrankpoem(newdf,Column,poem):
     if poem=="None":
         poem=random.sample(sentences,10)
         poem="\n".join(poem)
+    wordgraph=pd.DataFrame()
+    wordgraph["relations"]=buildknowledgebase(newdf[Column])
+    wordgraph["source"]=wordgraph["relations"].apply(lambda x: x[0])
+    wordgraph["target"]=wordgraph["relations"].apply(lambda x: x[2])
+    wordgraph["edgetype"]=wordgraph["relations"].apply(lambda x: x[1])
+    wordgraph.drop("relations",axis=1)
+    kg_df=pd.DataFrame({"source":wordgraph["source"],"target":wordgraph["target"],"edge":wordgraph["edgetype"]})
+    G=nx.from_pandas_edgelist(kg_df, "source", "target",edge_attr=True, create_using=nx.MultiDiGraph())
+    pos=nx.spring_layout(G)
+    nx.draw(G, with_labels=True, pos=pos, edge_cmap=plt.cm.Blues, )
+    
     wordlist=parralelproc(wordtypes,newdf[Column],createWordList)#create our wordlist
     for wtype in wordtypes:
         while wtype in poem:
