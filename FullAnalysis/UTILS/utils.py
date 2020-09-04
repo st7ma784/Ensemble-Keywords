@@ -23,7 +23,7 @@ from tensorboard.plugins.projector import (
     ProjectorConfig,
 )
 
-DEBUG=False
+DEBUG=os.environ['DEBUG'] 
 
 import spacy,os
 from collections import OrderedDict,defaultdict
@@ -166,9 +166,10 @@ class TextRank4Keyword():
         return list(node_weight.items())[:number]
 
     def getknowledge(self,doc):
-        print(doc.text)
-        print("Dependencies", [(t.text, t.dep_, t.head.text) for t in  filter(lambda w: w.dep_ in ("compound","amod", "dobj"), doc)])
-        print("WordTypes",[(self.check_verb(t),self.check_verb(t.head)) for t in  filter(lambda w: w.dep_ in ("compound","amod", "dobj"), doc)])
+        if DEBUG:
+            print(doc.text)
+            print("Dependencies", [(t.text, t.dep_, t.head.text) for t in  filter(lambda w: w.dep_ in ("compound","amod", "dobj"), doc)])
+            print("WordTypes",[(self.check_verb(t),self.check_verb(t.head)) for t in  filter(lambda w: w.dep_ in ("compound","amod", "dobj"), doc)])
         self.knowledgebase=set((t.text, t.dep_, t.head.text) for t in doc)
 
         '''
@@ -268,7 +269,7 @@ def buildPoem(df,poem,metaphor=1):
     poem=poem.split("\n")
     for sentence in poem:
         sentence=sentence.split()
-        while any(sentence) in wordtypes:
+        while any(item in wordtypes for item in sentence):
             for i in range(len(sentence)):
                 token=sentence[i]
                 if token in wordtypes:
@@ -278,7 +279,7 @@ def buildPoem(df,poem,metaphor=1):
                         
                             find weighted random first word. 
                             find word in graph. 
-                            if word is noun anmd compound
+                            if word is noun and compound
                                 add next noun
                             if word is verb 
                                 do i need to swap?
@@ -354,7 +355,8 @@ def parse_contents(contents, filename, date):
             df = pd.read_excel(BytesIO(decoded))
         
     except Exception as e:
-        print(e)
+        if DEBUG:
+            print(e)
         return html.Div([
             'There was an error processing this file.'
         ])
@@ -398,12 +400,12 @@ def CreateTensorBoard(Strings, out_loc=".", name="spaCy_vectors"):
     strings_stream = tqdm.tqdm(Strings, total=len(Strings), leave=False)
     queries = [w for w in strings_stream if model.vocab.has_vector(w)]
     vector_count = len(queries)
-
-    print(
-        "Building Tensorboard Projector metadata for ({}) vectors: {}".format(
-            vector_count, out_meta_file
+    if DEBUG:
+        print(
+            "Building Tensorboard Projector metadata for ({}) vectors: {}".format(
+                vector_count, out_meta_file
+            )
         )
-    )
 
     tf_vectors_variable = numpy.zeros((vector_count, model.vocab.vectors.shape[1]))
     with open(out_meta_file, "wb") as file_metadata:
@@ -420,7 +422,9 @@ def CreateTensorBoard(Strings, out_loc=".", name="spaCy_vectors"):
                 )
             )
             vec_index += 1
-    print("Running Tensorflow Session...")
+    if DEBUG:
+
+        print("Running Tensorflow Session...")
     sess = tf.InteractiveSession()
     tf.Variable(tf_vectors_variable, trainable=False, name=name)
     tf.global_variables_initializer().run()
@@ -435,8 +439,11 @@ def CreateTensorBoard(Strings, out_loc=".", name="spaCy_vectors"):
 
     # Tell the projector about the configured embeddings and metadata file
     visualize_embeddings(writer, config)
+    if DEBUG:
 
     # Save session and print run command to the output
-    print("Saving Tensorboard Session...")
+        print("Saving Tensorboard Session...")
+    
     saver.save(sess, path.join(out_loc, "{}.ckpt".format(name)))
-    print("Done. Run `tensorboard --logdir={0}` to view in Tensorboard".format(out_loc))
+    if DEBUG:
+        print("Done. Run `tensorboard --logdir={0}` to view in Tensorboard".format(out_loc))

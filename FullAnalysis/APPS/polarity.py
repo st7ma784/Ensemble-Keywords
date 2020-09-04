@@ -12,6 +12,7 @@ import numpy as np
 import chart_studio.plotly as py
 import random
 from App import app
+DEBUG=os.environ['DEBUG'] 
 def polarity(df,Column=None,Group=None):
     if Column=='*':
         TextFields=filter(lambda x:df[x].map(lambda x: len(str(x))).max()>100, df)

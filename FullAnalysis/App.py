@@ -19,23 +19,15 @@ from functools import partial
 from itertools import repeat
 import importlib
 from UTILS.utils import *
-DEBUG=True
-
+DEBUG=os.environ['DEBUG'] 
 app = dash.Dash(__name__)
-
 
 def main():
     global wordtypes
 
     server = app.server
-    sid=SentimentIntensityAnalyzer()
-    #Filename=os.path.join("DATA","DataoftheHeart_LakeDistrictsurvey.csv")
-    #df = pd.read_csv(Filename) # open file
-    #keys=list(df.keys())
     Funcs=filter(lambda x: x.endswith(".py"), [file for file in os.listdir("./APPS")])
     Funcs=map(lambda x: x[:-3],Funcs)
-    #TextFields=[10,12,13,14,15,17,19,20,21,27]
-    #GroupFields=['Age group','Postcode / Zip','Country','Gender']
     app.layout = html.Div([    
         dcc.Upload(id='upload-data',children=html.Div(['Drag and Drop or ',html.A('Select Files')]),style={'width': '100%', 'border':'1px'},),    
         html.Div(id='output-data-upload'),
@@ -44,9 +36,6 @@ def main():
         html.Div(id='FuncOutput'),
         html.Div(id='intermediate-value', style={'display': 'none'})
     ])
-    
-
-    # Hidden div inside the app that stores the dataset
     #<<<<<< ---------------- GENERIC CALLBACKS ------------------->>>>>>>>>>>
     
 

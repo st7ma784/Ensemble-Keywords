@@ -15,6 +15,7 @@ from gensim.models import Word2Vec,KeyedVectors
 from gensim.test.utils import datapath
 from App import app
 from gensim.models import doc2vec
+DEBUG=os.environ['DEBUG'] 
 
 '''
 from gensim.models import Sent2Vec

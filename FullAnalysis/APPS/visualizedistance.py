@@ -14,6 +14,7 @@ import random
 from App import app
 import plotly.graph_objects as go
 from gensim.matutils import jaccard
+DEBUG=os.environ['DEBUG'] 
 
 import networkx as nx
 docmodel=Doc2Vec.load("/app/UTILS/model/sentsmodel.bin")

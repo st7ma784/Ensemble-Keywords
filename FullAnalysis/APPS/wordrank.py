@@ -13,14 +13,8 @@ import chart_studio.plotly as py
 import random
 from App import app
 from UTILS.utils import * 
-wordlist=parralelproc(wordtypes,newdf[Column],createWordList)#create our wordlist
-    for wtype in wordtypes:
-        while wtype in poem:
-            wchoice=weighted_random(wordlist[wtype])
-            if wchoice is None:
-                poem=poem.replace(wtype,"Oh",1) #because we've found a place for interjections. GRR
-            else:
-                poem=poem.replace(wtype,wchoice,1)=["ADJ","ABSTNOUN","INTRANVERB","TRANVERB","INTJ","ADV","PRPN","VERB","NOUN"]
+DEBUG=os.environ['DEBUG'] 
+
 wordlist={wtype:list() for wtype in wordtypes}
 sentences=["The ADJ NOUN ADV TRANVERBs the NOUN.",
 "ADJ, ADJ NOUN ADV TRANVERBs a ADJ, ADJ NOUN.",

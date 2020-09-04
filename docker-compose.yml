@@ -5,3 +5,5 @@ services:
         build: FullAnalysis
         ports:
             - 8050:8050
+        env_file:
+            - ./FullAnalysis/.env    
