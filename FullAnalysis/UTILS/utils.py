@@ -154,7 +154,7 @@ class TextRank4Keyword():
                     selected_words.append(text.upper())
                 else:
                     text=token.text
-                    if len(text)>1 or text=="a" or text=="I" or token.tag_='punct': 
+                    if len(text)>1 or text=="a" or text=="I" or token.tag_=='punct': 
                         selected_words.append(text.lower())
 
             sentences.append(" ".join(selected_words))
@@ -199,7 +199,7 @@ class TextRank4Keyword():
             for r1, r2 in relations:
                 print("{:<10}\t{}\t{}".format(r1.text, r2.ent_type_, r2.text))
         '''
-        return set((t.text, t.dep_, t.head.text) for t in doc)
+        return set((t.text, t.dep_, t.head.text,self.check_verb(t),self.check_verb(t.head)) for t in doc)
         
     def analyze(self, text, 
                 candidate_pos=['NOUN', 'PROPN'], 
@@ -257,15 +257,17 @@ def buildPoem(df,poem,metaphor=1):
     wordlist=parralelproc(wordtypes,newdf[Column],createWordList)#create our wordlist
     wordgraph=pd.DataFrame()
     wordgraph["relations"]=buildknowledgebase(newdf[Column])
-    wordgraph["source"]=wordgraph["relations"].apply(lambda x: x[0])
+    wordgraph["start"]=wordgraph["relations"].apply(lambda x: x[0])
     wordgraph["target"]=wordgraph["relations"].apply(lambda x: x[2])
     wordgraph["edgetype"]=wordgraph["relations"].apply(lambda x: x[1])
+    wordgraph["starttype"]=wordgraph["relations"].apply(lambda x: x[4])
+    wordgraph["targettype"]=wordgraph["relations"].apply(lambda x: x[5])
     wordgraph.drop("relations",axis=1)
-    kg_df=pd.DataFrame({"source":wordgraph["source"],"target":wordgraph["target"],"edge":wordgraph["edgetype"]})
+    kg_df=pd.DataFrame({"source":wordgraph["start"],"target":wordgraph["target"],"edge":wordgraph["edgetype"]})
     G=nx.from_pandas_edgelist(kg_df, "source", "target",edge_attr=True, create_using=nx.MultiDiGraph())
     pos=nx.spring_layout(G)
     nx.draw(G, with_labels=True, pos=pos, edge_cmap=plt.cm.Blues, )
-    '''
+    
     poem=poem.split("\n")
     for sentence in poem:
         sentence=sentence.split()
@@ -276,18 +278,9 @@ def buildPoem(df,poem,metaphor=1):
                     for j in range(len(sentence)-i,0):
                         if all(word in wordtypes for word in x[i:len(sentence)-j]):
                             sublist=x[i:len(sentence)-j]
-                        
-                            find weighted random first word. 
-                            find word in graph. 
-                            if word is noun and compound
-                                add next noun
-                            if word is verb 
-                                do i need to swap?
-                            find next word
-                            look for all steps in graph for next word,
-                            randomly pick available paths
-                            repeat for that path. 
-    '''
+                            graphsearch=TraverseGraph(wordgraph,wordlist,sublist)                            
+                            if DEBUG: 
+                                print(graphsearch)
     for wtype in wordtypes:
         while wtype in poem:
             wchoice=weighted_random(wordlist[wtype])
@@ -296,6 +289,18 @@ def buildPoem(df,poem,metaphor=1):
             else:
                 poem=poem.replace(wtype,wchoice,1)
     return poem
+
+def TraverseGraph(graphtuples,wordlist,TypeList, startnode=None,outlist=[]):
+    if TypeList==[]: # end case
+        return outlist
+    if startnode is None:    # first case
+        RoutesList=graphtuples.loc(graphtuples['starttype']==typelist[0]).map(lambda x: TraverseGraph(graphtuples, wordlist,TypeList[1:],x['start'],list()))
+        return Routeslist
+    else: 
+        outlist=outlist+[startnode]
+        Routes=graphtuples.loc(graphtuples['start']==startnode and Routes['targettype']==typelist[0])
+        return Routes.map(lambda x: TraverseGraph(graphtuples, wordlist,TypeList[1:],x['start'],outlist))
+        
 def parralelproc(params,df,func,n_cores=os.cpu_count()):
     #print(params)
     results=[]
