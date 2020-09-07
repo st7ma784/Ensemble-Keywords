@@ -15,30 +15,31 @@ from gensim.models import Word2Vec,KeyedVectors
 from gensim.test.utils import datapath
 from App import app
 from gensim.models import doc2vec
-DEBUG=os.environ['DEBUG'] 
+from UTILS.utils import *
 
+DEBUG=bool(os.environ['DEBUG'])
 '''
 from gensim.models import Sent2Vec
 sents = Sent2Vec(common_texts, size=100, min_count=1)'''
 model=KeyedVectors.load_word2vec_format(datapath("/app/UTILS/model/model.gz"), binary=False)
 docmodel=Doc2Vec.load("/app/UTILS/model/sentsmodel.bin")                    
 def Sentence(text,Text):
-    return map(lambda i: model.wmdistance(i.lower(),Text.lower()), gensim.summarization.textcleaner.split_sentences(text))
+    return gensim.summarization.textcleaner.split_sentences(text)
     #could use summarize and then word sim? or combine with Keywords 
-def Response(text,Text):
-    return model.wmdistance(text.lower(),Text.lower())
-def Word(text,Text):
-    return model.wv.n_similarity(text.lower().split(), Text.lower().split())
+def Response(text):
+    return text
+def Word(text):
+    return text.lower().split()
 
 
 def sentiment(df,Column,Group, Granularity,Text):
     if Column=='*':
         Column=filter(lambda x:df[x].map(lambda x: len(str(x))).max()>100, df)
- 
-   
     newdf = df[~df[Column].isnull()] #filter out empty rows
-    df[Granularity] = df[Column].map(lambda text: globals()[Granularity](str(text).lower(),str(Text).lower()))
-    
+    #filter by group
+    df[Granularity] = df[Column].map(lambda text: globals()[Granularity](str(text).lower()))
+    CreateTensorBoard(list(df[Granularity].values.tolist()+[Text]))
+    '''
     Traces={}
     if Group != 'None':
         Groups=df[Group].unique()
@@ -69,7 +70,7 @@ def sentiment(df,Column,Group, Granularity,Text):
         title = "Sentiment compared to input string"
     )
     fig = go.Figure(data=data,layout=layout)
-    return fig
+    return fig'''
 
 def run(df): 
 

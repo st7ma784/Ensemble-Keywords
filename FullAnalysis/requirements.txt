@@ -16,3 +16,4 @@ dash-core-components
 gensim
 tqdm
 tensorflow
+networkx

@@ -15,7 +15,6 @@ from App import app
 from UTILS.utils import * 
 DEBUG=os.environ['DEBUG'] 
 
-wordlist={wtype:list() for wtype in wordtypes}
 sentences=["The ADJ NOUN ADV TRANVERBs the NOUN.",
 "ADJ, ADJ NOUN ADV TRANVERBs a ADJ, ADJ NOUN.",
 "ABSTNOUN is a ADJ NOUN.",
@@ -40,7 +39,7 @@ def wordrankpoem(newdf,Column,poem):
     if poem=="None":
         poem=random.sample(sentences,10)
         poem="\n".join(poem)
-    poem=buildPoem(newdf[Column],poem)
+    poem=buildPoem(newdf,Column,poem)
     return poem
 
 def wordrankpersubgroup(Column,Type,name,group,df):
@@ -62,7 +61,7 @@ def run(df):
     GroupFields=['None']+list(filter(lambda x:len(df[x].unique())<15,df))
     Texts=[{'label': key, 'value': key} for key in TextFields]
     Groups=[{'label': key, 'value': key} for key in GroupFields]
-    Wordtypes=[{'label': key, 'value': key} for key in wordtypes]
+    Wordtypes=[{'label': key, 'value': key} for key in TextRank4Keyword.wordtypes]
     OutPut=[    
         html.P('Text entries to process:'),
         dcc.Dropdown(id='wordranktext-select',options=Texts,style={'width': '100\%'}),

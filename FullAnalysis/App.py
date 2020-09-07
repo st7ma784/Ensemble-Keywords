@@ -19,12 +19,11 @@ from functools import partial
 from itertools import repeat
 import importlib
 from UTILS.utils import *
-DEBUG=os.environ['DEBUG'] 
+DEBUG=bool(os.environ['DEBUG'])
 app = dash.Dash(__name__)
 
 def main():
     global wordtypes
-
     server = app.server
     Funcs=filter(lambda x: x.endswith(".py"), [file for file in os.listdir("./APPS")])
     Funcs=map(lambda x: x[:-3],Funcs)
@@ -39,15 +38,27 @@ def main():
     #<<<<<< ---------------- GENERIC CALLBACKS ------------------->>>>>>>>>>>
     
 
-    @app.callback([Output('output-data-upload', 'children'),Output('intermediate-value', 'children'),],[Input('upload-data', 'contents')],[State('upload-data', 'filename'),State('upload-data', 'last_modified')])
-    def update_output(list_of_contents, list_of_names, list_of_dates):
+    @app.callback([Output('output-data-upload', 'children'),Output('intermediate-value', 'children'),],[Input('upload-data', 'filename'),],[State('upload-data', 'contents'),State('upload-data', 'last_modified')])
+    def update_output( list_of_names, list_of_contents, list_of_dates):
         if list_of_contents is not None:
-            children = parse_contents(list_of_contents, list_of_names, list_of_dates)
-        df=extractdf(list_of_contents, list_of_names)
-        df=df.to_json(date_format='iso', orient='split')
-        return children,df
+            try:
+                children,df = parse_contents(list_of_contents, list_of_names, list_of_dates)
+                #df=extractdf(list_of_contents, list_of_names)
+                df=df.to_json(date_format='iso', orient='split')
+                return children,df
+            except Exception as e: 
+                return html.Div([
+                'There was an error processing this file. {0}'.format(e)
+                ]),None
+        else:
+            return html.Div([
+                'Please Upload survey results as csv or xls'
+                ]),None
+        #
+       
+        
 
-    @app.callback(Output('FuncOutput', 'children'),[Input('Function-select', 'value'),Input('intermediate-value', 'children')])
+    @app.callback(Output('FuncOutput', 'children'),[Input('Function-select', 'value')],[State('intermediate-value', 'children')])
     def GenerateHTML(Function,jsondf):
         function_string = '.'.join(['APPS',Function,"run"])
         mod_name, func_name = function_string.rsplit('.',1)

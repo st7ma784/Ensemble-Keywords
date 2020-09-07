@@ -14,16 +14,8 @@ import math
 import numpy
 import spacy
 import tqdm
-
-import tensorflow as tf
-from tensorboard.plugins import projector
-
-from tensorboard.plugins.projector import (
-    visualize_embeddings,
-    ProjectorConfig,
-)
-
-DEBUG=os.environ['DEBUG'] 
+import networkx as nx
+DEBUG=bool(os.environ['DEBUG'])
 
 import spacy,os
 from collections import OrderedDict,defaultdict
@@ -32,7 +24,8 @@ from spacy.lang.en.stop_words import STOP_WORDS
 nlp = spacy.load('en_core_web_sm')
 class TextRank4Keyword():
     """Extract keywords from text"""
-    
+    wordtypes=["ADJ","ABSTNOUN","INTRANVERB","TRANVERB","INTJ","ADV","PRPN","VERB","NOUN"]
+
     def __init__(self):
         self.d = 0.85 # damping coefficient, usually is .85
         self.min_diff = 1e-5 # convergence threshold
@@ -253,34 +246,41 @@ def buildTemplateFromText(rawpoem):
     tr4w=TextRank4Keyword()
     template=tr4w.reversetemplate(nlp(poem))
     return template
-def buildPoem(df,poem,metaphor=1):
+def buildPoem(df,Column,poem,metaphor=1):
+    wordtypes=TextRank4Keyword.wordtypes
+    if DEBUG:
+        print(wordtypes)
+    newdf = df[~df[Column].isnull()]
     wordlist=parralelproc(wordtypes,newdf[Column],createWordList)#create our wordlist
     wordgraph=pd.DataFrame()
     wordgraph["relations"]=buildknowledgebase(newdf[Column])
     wordgraph["start"]=wordgraph["relations"].apply(lambda x: x[0])
     wordgraph["target"]=wordgraph["relations"].apply(lambda x: x[2])
     wordgraph["edgetype"]=wordgraph["relations"].apply(lambda x: x[1])
-    wordgraph["starttype"]=wordgraph["relations"].apply(lambda x: x[4])
-    wordgraph["targettype"]=wordgraph["relations"].apply(lambda x: x[5])
+    wordgraph["starttype"]=wordgraph["relations"].apply(lambda x: x[3])
+    wordgraph["targettype"]=wordgraph["relations"].apply(lambda x: x[4])
     wordgraph.drop("relations",axis=1)
     kg_df=pd.DataFrame({"source":wordgraph["start"],"target":wordgraph["target"],"edge":wordgraph["edgetype"]})
     G=nx.from_pandas_edgelist(kg_df, "source", "target",edge_attr=True, create_using=nx.MultiDiGraph())
     pos=nx.spring_layout(G)
-    nx.draw(G, with_labels=True, pos=pos, edge_cmap=plt.cm.Blues, )
+    #nx.draw(G, with_labels=True, pos=pos, edge_cmap=plt.cm.Blues, )
     
     poem=poem.split("\n")
     for sentence in poem:
-        sentence=sentence.split()
-        while any(item in wordtypes for item in sentence):
-            for i in range(len(sentence)):
-                token=sentence[i]
-                if token in wordtypes:
-                    for j in range(len(sentence)-i,0):
-                        if all(word in wordtypes for word in x[i:len(sentence)-j]):
-                            sublist=x[i:len(sentence)-j]
-                            graphsearch=TraverseGraph(wordgraph,wordlist,sublist)                            
-                            if DEBUG: 
-                                print(graphsearch)
+        parts=sentence.split()
+        #while any(item in wordtypes for item in sentence):
+        for i in range(len(parts)):
+            token=parts[i]
+            if token in wordtypes:
+                for j in range(len(parts)-i,0):
+                    if all(word in wordtypes for word in x[i:len(parts)-j]):
+                        sublist=x[i:len(parts)-j]
+                        graphsearch=TraverseGraph(wordgraph,wordlist,sublist)                            
+                        
+                        if DEBUG: 
+                            print(graphsearch)
+                        x[i:len(parts)-j]=graphsearch
+    poem="".join(poem)
     for wtype in wordtypes:
         while wtype in poem:
             wchoice=weighted_random(wordlist[wtype])
@@ -293,13 +293,14 @@ def buildPoem(df,poem,metaphor=1):
 def TraverseGraph(graphtuples,wordlist,TypeList, startnode=None,outlist=[]):
     if TypeList==[]: # end case
         return outlist
-    if startnode is None:    # first case
-        RoutesList=graphtuples.loc(graphtuples['starttype']==typelist[0]).map(lambda x: TraverseGraph(graphtuples, wordlist,TypeList[1:],x['start'],list()))
+    
+    elif startnode is None:    # first case
+        RoutesList=graphtuples.loc(graphtuples['starttype']==TypeList[0]).map(lambda x: TraverseGraph(graphtuples, wordlist,TypeList[1:],x['start'],list()))
         return Routeslist
     else: 
         outlist=outlist+[startnode]
-        Routes=graphtuples.loc(graphtuples['start']==startnode and Routes['targettype']==typelist[0])
-        return Routes.map(lambda x: TraverseGraph(graphtuples, wordlist,TypeList[1:],x['start'],outlist))
+        Routes=graphtuples.loc(graphtuples['start']==startnode and Routes['targettype']==TypeList[0])
+        #pic random and return from return Routes.map(lambda x: TraverseGraph(graphtuples, wordlist,TypeList[1:],x['start'],outlist))
         
 def parralelproc(params,df,func,n_cores=os.cpu_count()):
     #print(params)
@@ -349,7 +350,8 @@ def weighted_random(pairs):
 def parse_contents(contents, filename, date):
     global df,TextFields,GroupFields,keys
     content_type, content_string = contents.split(',')
-
+    if DEBUG:
+        print("Reading in ")
     decoded = base64.b64decode(content_string)
     try:
         if 'csv' in filename:
@@ -362,20 +364,20 @@ def parse_contents(contents, filename, date):
     except Exception as e:
         if DEBUG:
             print(e)
-        return html.Div([
+        return (html.Div([
             'There was an error processing this file.'
-        ])
-    returnlist=[html.H5(filename),html.H6(datetime.datetime.fromtimestamp(date)),]
+        ]),None)
+    returnlist=[html.H5(filename),html.H6(datetime.datetime.fromtimestamp(date))]
     if DEBUG:
-        returnlist=returnlist.extend([
+        returnlist=returnlist+[
             html.Hr(),  # horizontal line
             html.Div('Raw Content'),
             html.Pre(contents[0:200] + '...', style={
                 'whiteSpace': 'pre-wrap',
                 'wordBreak': 'break-all'
             })
-        ])
-    return html.Div(returnlist)
+        ]
+    return (html.Div(returnlist),df)
 def readtextfile(contents, filename):
     if contents is not None:
         content_type, content_string = contents.split(',')
@@ -387,18 +389,39 @@ def readtextfile(contents, filename):
     return TEXT
 def buildknowledgebase(df):
     tr4w = TextRank4Keyword()
-    return list(itertools.chain.from_iterable(df.apply(lambda x:tr4w.getknowledge(nlp(x)))))
-
+    try:
+        iterable=df.apply(lambda x:tr4w.getknowledge(nlp(x)))
+    except: #probs a series
+        iterable=df.apply(lambda x:itertools.chain.from_iterable(tr4w.getknowledge(nlp(str(i))) for i in x.values.tolist()))
+    return list(itertools.chain.from_iterable(iterable))
 def createWordList(df,param):
     tr4w = TextRank4Keyword()
     toprankslist=list(df.apply(lambda x:TextRankAnalyse(tr4w,x,param)))
     return list(itertools.chain.from_iterable(toprankslist))
 
 def TextRankAnalyse(tr4w, text,wtype):
-    tr4w.analyze(text, candidate_pos = [wtype], window_size=4, lower=False)
-    return tr4w.get_keywords(10)
+    out=list()
+    try:
+        tr4w.analyze(text, candidate_pos = [wtype], window_size=4, lower=False)#
+        out=tr4w.get_keywords(10)
+    except: #text is series
+        out=list()
+        for i in text.values.tolist():
+            if len(str(i))>17:   #I presume this is therefore a good text to learn on. 
+                tr4w.analyze(str(i), candidate_pos = [wtype], window_size=4, lower=False)
+                out=out+tr4w.get_keywords(10)
+    return out
 
 def CreateTensorBoard(Strings, out_loc=".", name="spaCy_vectors"):
+    
+    import tensorflow as tf
+    from tensorboard.plugins import projector
+
+    from tensorboard.plugins.projector import (
+        visualize_embeddings,
+        ProjectorConfig,
+    )
+
     meta_file = "{}.tsv".format(name)
     out_meta_file = os.path.join(out_loc, meta_file)
 
@@ -450,5 +473,10 @@ def CreateTensorBoard(Strings, out_loc=".", name="spaCy_vectors"):
         print("Saving Tensorboard Session...")
     
     saver.save(sess, path.join(out_loc, "{}.ckpt".format(name)))
+    
+    os.system(
+    "cd {0} \
+    && tensorboard --port=6007 --logdir runs"
+    ) 
     if DEBUG:
         print("Done. Run `tensorboard --logdir={0}` to view in Tensorboard".format(out_loc))
