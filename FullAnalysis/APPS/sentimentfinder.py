@@ -22,7 +22,7 @@ DEBUG=bool(os.environ['DEBUG'])
 from gensim.models import Sent2Vec
 sents = Sent2Vec(common_texts, size=100, min_count=1)'''
 model=KeyedVectors.load_word2vec_format(datapath("/app/UTILS/model/model.gz"), binary=False)
-docmodel=Doc2Vec.load("/app/UTILS/model/sentsmodel.bin")                    
+docmodel=doc2vec.Doc2Vec.load("/app/UTILS/model/sentsmodel.bin")                    
 def Sentence(text,Text):
     return gensim.summarization.textcleaner.split_sentences(text)
     #could use summarize and then word sim? or combine with Keywords 
@@ -32,13 +32,14 @@ def Word(text):
     return text.lower().split()
 
 
-def sentiment(df,Column,Group, Granularity,Text):
+def sentiment(df,Column,Group,Text):
     if Column=='*':
         Column=filter(lambda x:df[x].map(lambda x: len(str(x))).max()>100, df)
     newdf = df[~df[Column].isnull()] #filter out empty rows
     #filter by group
-    df[Granularity] = df[Column].map(lambda text: globals()[Granularity](str(text).lower()))
-    CreateTensorBoard(list(df[Granularity].values.tolist()+[Text]))
+    df["TextEmbedding"] = df[Column].map(lambda text: Response(str(text).lower()))
+    port=CreateTensorBoard(list(df["TextEmbedding"].values.tolist()+[Text]),docmodel)
+    return "Opened Tensorboard at port {}.".format(port)
     '''
     Traces={}
     if Group != 'None':
@@ -76,26 +77,27 @@ def run(df):
 
     TextFields=list(filter(lambda x:df[x].map(lambda x: len(str(x))).max()>100, df))+["*"]
     GroupFields=list(filter(lambda x:len(df[x].unique())<15,df))+['None']
-    OptionFields=["Word","Sentence","Response"]
+    #OptionFields=["Word","Sentence","Response"]
     Texts=[{'label': key, 'value': key} for key in TextFields]
     Groups=[{'label': key, 'value': key} for key in GroupFields]
-    Options=[{'label': key, 'value': key} for key in OptionFields]
+    #Options=[{'label': key, 'value': key} for key in OptionFields]
     OutPut=[    
         html.P('Text entries to process:'),
         dcc.Dropdown(id='sentimenttext-select',options=Texts,style={'width': '100\%'}),
         html.P('Grouped By'),
         dcc.Dropdown(id='sentimentgroup-select',options=Groups,style={'width': '100\%'}),
         html.P('Similarity comparison of '),
-        dcc.Dropdown(id='sentimentgranularity-select',options=Options,style={'width': '100\%'}),
-        html.P('Sentiment to compare to'),
+        #dcc.Dropdown(id='sentimentgranularity-select',options=Options,style={'width': '100\%'}),
+       # html.P('Sentiment to compare to'),
         dcc.Textarea(
             id='sentimentext-entry',
             placeholder='Enter a value...',
             value='There is much hope for the future',
         ),
         html.Button('Submit', id='sentimenttextarea-button', n_clicks=0),
-        
-        dcc.Graph('sentimentgraph', config={'displayModeBar': False}),
+        html.Div(id='sentimentresult'),
+
+        #dcc.Graph('sentimentgraph', config={'displayModeBar': False}),
 
     ]
     #need to take input string

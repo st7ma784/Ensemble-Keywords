@@ -124,13 +124,13 @@ def main():
     #<<<<<< ---------------- SENTIMENT CALLBACKS ------------------->>>>>>>>>>>
 
 
-    @app.callback(Output('sentimentgraph', 'figure'),[Input('sentimenttextarea-button','n_clicks')],[State('sentimenttext-select','value'),State('sentimentgroup-select','value'),State('intermediate-value', 'children'),State('sentimentgranularity-select','value'),State('sentimentext-entry', 'value')])
-    def drawpolaritygraph(_,Column,Group,jsondf,Granularity,Text):
+    @app.callback(Output('sentimentresult', 'children'),[Input('sentimenttextarea-button','n_clicks')],[State('sentimenttext-select','value'),State('sentimentgroup-select','value'),State('intermediate-value', 'children'),State('sentimentext-entry', 'value')])
+    def drawpolaritygraph(_,Column,Group,jsondf,Text):
         df = pd.read_json(jsondf, orient='split')
+        #return "SUBMIT CLICKED with: {}".format(Text)
         mod = importlib.import_module("APPS.sentimentfinder")
         sentiment = getattr(mod, "sentiment")
-
-        return sentiment(df,Column,Group,Granularity,Text)
+        return sentiment(df,Column,Group,Text)
 
 
 
@@ -141,7 +141,7 @@ def main():
         df = pd.read_json(jsondf, orient='split')
         mod = importlib.import_module("APPS.visualizedistance")
         sentiment = getattr(mod, "visualizedistance")
-        return visualizedistance(df,Column,threshold)
+        return visualizedistance(df,threshold,Column)
     
     #<<<<<< ---------------- RUN  ------------------->>>>>>>>>>>
 

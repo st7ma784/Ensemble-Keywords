@@ -12,12 +12,13 @@ import numpy as np
 import chart_studio.plotly as py
 import random
 from App import app
-import plotly.graph_objects as go
+import plotly.graph_objects as graph_objects
+import os
 from gensim.matutils import jaccard
 DEBUG=bool(os.environ['DEBUG'])
 import networkx as nx
 docmodel=Doc2Vec.load("/app/UTILS/model/sentsmodel.bin")
-def visualizedistance(df,Column=None,threshold):
+def visualizedistance(df,threshold,Column=None):
     df['VectorList']=df[Column].map(lambda text: docmodel.infer_vector(text.split))
     G = nx.Graph()
     map(lambda i,vector: G.add_node(i),enumerate(df['VectorList']))
@@ -90,7 +91,7 @@ def visualizedistance(df,Column=None,threshold):
                     xref="paper", yref="paper",
                     x=0.005, y=-0.002 ) ],
                 xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
+                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
                 )
     fig = go.Figure(data=data,layout=layout)
     return fig

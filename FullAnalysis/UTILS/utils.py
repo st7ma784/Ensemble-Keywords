@@ -147,8 +147,8 @@ class TextRank4Keyword():
                     selected_words.append(text.upper())
                 else:
                     text=token.text
-                    if len(text)>1 or text=="a" or text=="I" or token.tag_=='punct': 
-                        selected_words.append(text.lower())
+                    #if len(text)>1 or text=="a" or text=="I" or token.is_punct or token.is_stop: 
+                    selected_words.append(text.lower())
 
             sentences.append(" ".join(selected_words))
         return "\n".join(sentences)
@@ -280,26 +280,38 @@ def buildPoem(df,Column,poem,metaphor=1):
                         if DEBUG: 
                             print(graphsearch)
                         x[i:len(parts)-j]=graphsearch
-    poem="".join(poem)
+    '''poem=" ".join(poem)
     for wtype in wordtypes:
-        while wtype in poem:
-            wchoice=weighted_random(wordlist[wtype])
-            if wchoice is None:
-                poem=poem.replace(wtype,"Oh",1) #because we've found a place for interjections. GRR
-            else:
-                poem=poem.replace(wtype,wchoice,1)
+        if wtype in poem:
+            if DEBUG:
+                print("Failed to remove {0}".format(wtype))
+            while wtype in poem:
+                wchoice=weighted_random(wordlist[wtype])
+                if wchoice is None:
+                    poem=poem.replace(wtype,"Oh",1) #because we've found a place for interjections. GRR
+                else:
+                    poem=poem.replace(wtype,wchoice,1)'''
     return poem
 
-def TraverseGraph(graphtuples,wordlist,TypeList, startnode=None,outlist=[]):
-    if TypeList==[]: # end case
+def TraverseGraph(graphtuples,wordlist,TypeList, startnodes=None,outlist=[]):
+    if startnodes is None:
+        # first case
+        # find the first set of options 
+        # forward pass with list of possible startnodes        
+        NextSteps=graphtuples['start'].loc(graphtuples['starttype']==TypeList[0]).values.tolist()#map(lambda x: TraverseGraph(graphtuples, wordlist,TypeList[1:],x['start'],list()))
+        return TraverseGraph(graphtuples,wordlist,TypeList,startnodes=NextSteps,outlist=[])
+    #we have our list of potential start words -> We'll do a weighted random 
+    AddedWord=weighted_random(filter(lambda word: word[0] in startnodes, wordlist[TypeList[0]]))
+    outlist=outlist+[AddedWord]
+    #if there are no more words left to find, lets stop there.
+    if len(TypeList)==1: # end case our types is just defining the word choices we've been passed. none left to find
         return outlist
-    
-    elif startnode is None:    # first case
-        RoutesList=graphtuples.loc(graphtuples['starttype']==TypeList[0]).map(lambda x: TraverseGraph(graphtuples, wordlist,TypeList[1:],x['start'],list()))
-        return Routeslist
-    else: 
-        outlist=outlist+[startnode]
-        Routes=graphtuples.loc(graphtuples['start']==startnode and Routes['targettype']==TypeList[0])
+    else: #not first case nor last so there are words left to find and we've added one. 
+        #lets work out our next step based on the word type after current, 
+        NextSteps=graphtuples['target'].loc(graphtuples['start']==AddedWord and graphtuples['targettype']==TypeList[1]).values.tolist() 
+        # remember to add spaces. 
+        #what if nextsteps is empty 
+        return TraverseGraph(graphtuples,wordlist,TypeList[1:],startnodes=NextSteps,outlist=outlist)
         #pic random and return from return Routes.map(lambda x: TraverseGraph(graphtuples, wordlist,TypeList[1:],x['start'],outlist))
         
 def parralelproc(params,df,func,n_cores=os.cpu_count()):
@@ -412,7 +424,7 @@ def TextRankAnalyse(tr4w, text,wtype):
                 out=out+tr4w.get_keywords(10)
     return out
 
-def CreateTensorBoard(Strings, out_loc=".", name="spaCy_vectors"):
+def CreateTensorBoard(Strings,model, out_loc=".", name="spaCy_vectors"):
     
     import tensorflow as tf
     from tensorboard.plugins import projector
@@ -421,11 +433,41 @@ def CreateTensorBoard(Strings, out_loc=".", name="spaCy_vectors"):
         visualize_embeddings,
         ProjectorConfig,
     )
+    embeddings={String:model.infer_vector(String.split()) for String in Strings}
+    embeddings_vectors = np.stack(embeddings.values(), axis=0)
+    '''
+        # Create some variables.
+    emb = tf.Variable(embeddings_vectors, name='word_embeddings')
 
-    meta_file = "{}.tsv".format(name)
+    # Add an op to initialize the variable.
+    init_op = tf.compat.v1.global_variables_initializer()
+    # Add ops to save and restore all the variables.
+    saver = tf.compat.v1.train.Saver([emb])
+
+    # Later, launch the model, initialize the variables and save the
+    # variables to disk.
+    with tf.compat.v1.Session() as sess:
+        sess.run(init_op)
+    '''
+    sess = tf.compat.v1.InteractiveSession()
+    emb=tf.Variable(embeddings_vectors, name='word_embeddings') 
+    tf.compat.v1.global_variables_initializer()
+    saver = tf.compat.v1.train.Saver([emb])
+    words = '\n'.join(list(embeddings.keys()))
+    with open(os.path.join(out_loc, 'metadata.tsv'), 'w') as f:
+        f.write(words)
+
+    # .tsv file written in model_dir/metadata.tsv
+
+    # Save the variables to disk.
+    #saver.save(sess, path.join(out_loc, "{}.ckpt".format(name)))
+    save_path = saver.save(sess, os.path.join(out_loc, "{}.ckpt".format(name)))
+    print("Model saved in path: %s" % save_path)
+    '''meta_file = "{}.tsv".format(name)
     out_meta_file = os.path.join(out_loc, meta_file)
 
     strings_stream = tqdm.tqdm(Strings, total=len(Strings), leave=False)
+    
     queries = [w for w in strings_stream if model.vocab.has_vector(w)]
     vector_count = len(queries)
     if DEBUG:
@@ -453,6 +495,9 @@ def CreateTensorBoard(Strings, out_loc=".", name="spaCy_vectors"):
     if DEBUG:
 
         print("Running Tensorflow Session...")
+
+
+
     sess = tf.InteractiveSession()
     tf.Variable(tf_vectors_variable, trainable=False, name=name)
     tf.global_variables_initializer().run()
@@ -467,16 +512,17 @@ def CreateTensorBoard(Strings, out_loc=".", name="spaCy_vectors"):
 
     # Tell the projector about the configured embeddings and metadata file
     visualize_embeddings(writer, config)
+    '''
     if DEBUG:
 
     # Save session and print run command to the output
         print("Saving Tensorboard Session...")
     
-    saver.save(sess, path.join(out_loc, "{}.ckpt".format(name)))
+    
     
     os.system(
-    "cd {0} \
-    && tensorboard --port=6007 --logdir runs"
+    "tensorboard --logdir {0}/ --host 0.0.0.0 --port 6006".format(out_loc) 
     ) 
     if DEBUG:
         print("Done. Run `tensorboard --logdir={0}` to view in Tensorboard".format(out_loc))
+    return 6006
