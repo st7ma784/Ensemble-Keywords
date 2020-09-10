@@ -10,7 +10,7 @@ from textblob import TextBlob
 import pandas as pd
 import numpy as np
 import chart_studio.plotly as py
-import random
+import random,os
 from App import app
 DEBUG=os.environ['DEBUG'] 
 def polarity(df,Column=None,Group=None):

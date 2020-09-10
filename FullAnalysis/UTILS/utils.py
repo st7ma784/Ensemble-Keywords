@@ -424,7 +424,7 @@ def TextRankAnalyse(tr4w, text,wtype):
                 out=out+tr4w.get_keywords(10)
     return out
 
-def CreateTensorBoard(Strings,model, out_loc=".", name="spaCy_vectors"):
+def CreateTensorBoard(Strings,Text,model, out_loc=".", name="spaCy_vectors"):
     
     import tensorflow as tf
     from tensorboard.plugins import projector
@@ -433,6 +433,9 @@ def CreateTensorBoard(Strings,model, out_loc=".", name="spaCy_vectors"):
         visualize_embeddings,
         ProjectorConfig,
     )
+    tf.compat.v1.disable_eager_execution()
+    Texts=" ".join(Text).split("\n")
+    Strings=Strings+Texts
     embeddings={String:model.infer_vector(String.split()) for String in Strings}
     embeddings_vectors = np.stack(embeddings.values(), axis=0)
     '''
@@ -450,69 +453,35 @@ def CreateTensorBoard(Strings,model, out_loc=".", name="spaCy_vectors"):
         sess.run(init_op)
     '''
     sess = tf.compat.v1.InteractiveSession()
-    emb=tf.Variable(embeddings_vectors, name='word_embeddings') 
+    emb=tf.Variable(embeddings_vectors, name=name) 
     tf.compat.v1.global_variables_initializer()
     saver = tf.compat.v1.train.Saver([emb])
     words = '\n'.join(list(embeddings.keys()))
     with open(os.path.join(out_loc, 'metadata.tsv'), 'w') as f:
         f.write(words)
-
-    # .tsv file written in model_dir/metadata.tsv
-
-    # Save the variables to disk.
-    #saver.save(sess, path.join(out_loc, "{}.ckpt".format(name)))
+    meta_file = "{}.tsv".format('metadata')
     save_path = saver.save(sess, os.path.join(out_loc, "{}.ckpt".format(name)))
     print("Model saved in path: %s" % save_path)
-    '''meta_file = "{}.tsv".format(name)
-    out_meta_file = os.path.join(out_loc, meta_file)
 
-    strings_stream = tqdm.tqdm(Strings, total=len(Strings), leave=False)
-    
-    queries = [w for w in strings_stream if model.vocab.has_vector(w)]
-    vector_count = len(queries)
-    if DEBUG:
-        print(
-            "Building Tensorboard Projector metadata for ({}) vectors: {}".format(
-                vector_count, out_meta_file
-            )
-        )
+    metadata_path = os.path.join(out_loc, 'metadata.tsv')
+    with open(metadata_path, "w") as f:
+        [f.write(word + "\n") for word in words]
 
-    tf_vectors_variable = numpy.zeros((vector_count, model.vocab.vectors.shape[1]))
-    with open(out_meta_file, "wb") as file_metadata:
-        # Define columns in the first row
-        file_metadata.write("Text\tFrequency\n".encode("utf-8"))
-        vec_index = 0
-        for text in tqdm.tqdm(queries, total=len(queries), leave=False):
-            text = "<Space>" if text.lstrip() == "" else text
-            lex = model.vocab[text]
-            tf_vectors_variable[vec_index] = model.vocab.get_vector(text)
-            file_metadata.write(
-                "{}\t{}\n".format(text, math.exp(lex.prob) * vector_count).encode(
-                    "utf-8"
-                )
-            )
-            vec_index += 1
-    if DEBUG:
+    if not os.path.exists(out_loc):
+        os.mkdir(out_loc)
 
-        print("Running Tensorflow Session...")
-
-
-
-    sess = tf.InteractiveSession()
-    tf.Variable(tf_vectors_variable, trainable=False, name=name)
-    tf.global_variables_initializer().run()
-    saver = tf.train.Saver()
-    writer = tf.summary.FileWriter(out_loc, sess.graph)
-
+    summary_writer = tf.summary.FileWriter(out_loc, graph=sess.graph, )
     # Link the embeddings into the config
     config = ProjectorConfig()
     embed = config.embeddings.add()
     embed.tensor_name = name
-    embed.metadata_path = meta_file
+
+    embed.metadata_path = os.path.join(log_dir, 'metadata.tsv')
+    visualize_embeddings(summary_writer, config)
 
     # Tell the projector about the configured embeddings and metadata file
-    visualize_embeddings(writer, config)
-    '''
+    #visualize_embeddings(writer, config)
+    
     if DEBUG:
 
     # Save session and print run command to the output
