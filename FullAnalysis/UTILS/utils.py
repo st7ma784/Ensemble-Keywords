@@ -24,7 +24,7 @@ from spacy.lang.en.stop_words import STOP_WORDS
 nlp = spacy.load('en_core_web_sm')
 class TextRank4Keyword():
     """Extract keywords from text"""
-    wordtypes=["ADJ","ABSTNOUN","INTRANVERB","TRANVERB","INTJ","ADV","PRPN","VERB","NOUN"]
+    wordtypes=["ADJ","ABSTNOUN","INTRANVERB","TRANVERB","ADV","PRPN","VERB","NOUN","INTJ"]
 
     def __init__(self):
         self.d = 0.85 # damping coefficient, usually is .85
@@ -33,7 +33,7 @@ class TextRank4Keyword():
         self.node_weight = None # save keywords and its weight
         with open(os.path.join("UTILS","DATA",'abstractnounlist.txt'),'r') as file:
             ABST=file.readlines()
-        self.wordtypes=["ADJ","ABSTNOUN","INTRANVERB","TRANVERB","INTJ","ADV","PRPN","VERB","NOUN"]
+        self.wordtypes=["ADJ","ABSTNOUN","INTRANVERB","TRANVERB","ADV","PRPN","VERB","NOUN","INTJ"]
         self.ABSTLIST=[word.lower().replace("\n","") for word in ABST]
         self.knowledgebase=set()
         #print(self.ABSTLIST)
@@ -66,7 +66,7 @@ class TextRank4Keyword():
                 #print("Found to be ABST" + token.text)
                 return 'ABSTNOUN'
             else:
-                return token.pos_
+                return 'NOUN'
         else:
             return token.pos_
     def sentence_segment(self, doc, candidate_pos, lower):
@@ -153,11 +153,13 @@ class TextRank4Keyword():
             sentences.append(" ".join(selected_words))
         return "\n".join(sentences)
 
-    def get_keywords(self, number=10):
+    def get_keywords(self, number=None):
         """Print top number keywords"""
         node_weight = OrderedDict(sorted(self.node_weight.items(), key=lambda t: t[1], reverse=True))
-        return list(node_weight.items())[:number]
-
+        if number is not None:
+            return list(node_weight.items())[:number]
+        else:
+            return list(node_weight.items())
     def getknowledge(self,doc):
         if DEBUG:
             print(doc.text)
@@ -246,12 +248,13 @@ def buildTemplateFromText(rawpoem):
     tr4w=TextRank4Keyword()
     template=tr4w.reversetemplate(nlp(poem))
     return template
+
 def buildPoem(df,Column,poem,metaphor=1):
     wordtypes=TextRank4Keyword.wordtypes
     if DEBUG:
         print(wordtypes)
     newdf = df[~df[Column].isnull()]
-    wordlist=parralelproc(wordtypes,newdf[Column],createWordList)#create our wordlist
+    wordlist={wtype:createWordList(df[Column],wtype) for wtype in wordtypes}#:parralelproc(wordtypes,newdf[Column],createWordList)#create our wordlist
     wordgraph=pd.DataFrame()
     wordgraph["relations"]=buildknowledgebase(newdf[Column])
     wordgraph["start"]=wordgraph["relations"].apply(lambda x: x[0])
@@ -259,59 +262,72 @@ def buildPoem(df,Column,poem,metaphor=1):
     wordgraph["edgetype"]=wordgraph["relations"].apply(lambda x: x[1])
     wordgraph["starttype"]=wordgraph["relations"].apply(lambda x: x[3])
     wordgraph["targettype"]=wordgraph["relations"].apply(lambda x: x[4])
-    wordgraph.drop("relations",axis=1)
+    #wordgraph.drop("relations",axis=1)
     kg_df=pd.DataFrame({"source":wordgraph["start"],"target":wordgraph["target"],"edge":wordgraph["edgetype"]})
     G=nx.from_pandas_edgelist(kg_df, "source", "target",edge_attr=True, create_using=nx.MultiDiGraph())
     pos=nx.spring_layout(G)
     #nx.draw(G, with_labels=True, pos=pos, edge_cmap=plt.cm.Blues, )
     
-    poem=poem.split("\n")
-    for sentence in poem:
-        parts=sentence.split()
-        #while any(item in wordtypes for item in sentence):
-        for i in range(len(parts)):
-            token=parts[i]
-            if token in wordtypes:
-                for j in range(len(parts)-i,0):
-                    if all(word in wordtypes for word in x[i:len(parts)-j]):
-                        sublist=x[i:len(parts)-j]
-                        graphsearch=TraverseGraph(wordgraph,wordlist,sublist)                            
+    
+    if metaphor==1:
+        poem=poem.split("\n")
+        finished=[]
+        for sentence in poem:
+            parts=sentence.split(" ")
+            #while any(item in wordtypes for item in sentence):
+            i=0
+            while any(word in wordtypes for word in parts):
+                for word in wordtypes:
+                    if word in parts:
+                        i=parts.index(word)
+                        break
+                for j in range(len(parts),i,-1):
+                    if all(word in wordtypes for word in parts[i:j]):
                         
+                        graphsearch=TraverseGraph(wordgraph,wordlist,parts[i:j])                            
                         if DEBUG: 
                             print(graphsearch)
-                        x[i:len(parts)-j]=graphsearch
-    '''poem=" ".join(poem)
-    for wtype in wordtypes:
-        if wtype in poem:
-            if DEBUG:
-                print("Failed to remove {0}".format(wtype))
-            while wtype in poem:
-                wchoice=weighted_random(wordlist[wtype])
-                if wchoice is None:
-                    poem=poem.replace(wtype,"Oh",1) #because we've found a place for interjections. GRR
-                else:
-                    poem=poem.replace(wtype,wchoice,1)'''
+                        for word in range(len(graphsearch)): 
+                            parts[i+word]=graphsearch[word] #these are letters not TOKENS !!! ARGS
+                        
+                        
+                if i>=len(parts): 
+                    i=0
+            finished+=parts
+        poem="\n".join(finished)
+    if metaphor!=1:
+        for wtype in wordtypes:
+            if wtype in poem:
+                
+                while wtype in poem:
+                    wchoice=weighted_random(wordlist[wtype])
+                    if wchoice is None:
+                        print(wordlist[wtype])
+                        poem=poem.replace(wtype,"Oh",1) #because we've found a place for interjections. GRR
+                    else:
+                        poem=poem.replace(wtype,wchoice,1)
+    
+
     return poem
 
 def TraverseGraph(graphtuples,wordlist,TypeList, startnodes=None,outlist=[]):
     if startnodes is None:
-        # first case
-        # find the first set of options 
-        # forward pass with list of possible startnodes        
-        NextSteps=graphtuples['start'].loc(graphtuples['starttype']==TypeList[0]).values.tolist()#map(lambda x: TraverseGraph(graphtuples, wordlist,TypeList[1:],x['start'],list()))
-        return TraverseGraph(graphtuples,wordlist,TypeList,startnodes=NextSteps,outlist=[])
+        #newdf=
+        return TraverseGraph(graphtuples,wordlist,TypeList,graphtuples.loc[graphtuples["starttype"]==TypeList[0]]["start"].values.tolist(),outlist=[])
     #we have our list of potential start words -> We'll do a weighted random 
-    AddedWord=weighted_random(filter(lambda word: word[0] in startnodes, wordlist[TypeList[0]]))
+    AddedWord=weighted_random(list(filter(lambda word: word[0] in startnodes, wordlist[TypeList[0]])))
     outlist=outlist+[AddedWord]
     #if there are no more words left to find, lets stop there.
     if len(TypeList)==1: # end case our types is just defining the word choices we've been passed. none left to find
         return outlist
     else: #not first case nor last so there are words left to find and we've added one. 
-        #lets work out our next step based on the word type after current, 
-        NextSteps=graphtuples['target'].loc(graphtuples['start']==AddedWord and graphtuples['targettype']==TypeList[1]).values.tolist() 
-        # remember to add spaces. 
         #what if nextsteps is empty 
-        return TraverseGraph(graphtuples,wordlist,TypeList[1:],startnodes=NextSteps,outlist=outlist)
+        try:
+            #newdf = #df[~df[Column].isnull()].values.tolist()
+            return TraverseGraph(graphtuples,wordlist,TypeList[1:],graphtuples.loc[graphtuples["start"].equals(AddedWord) and graphtuples["targettype"].equals(TypeList[1])]["target"],outlist)
+        except Exception as e:
+            print("Failed to find tuple starting with {0} to type {1}".format(AddedWord,TypeList[0]))
+            return outlist
         #pic random and return from return Routes.map(lambda x: TraverseGraph(graphtuples, wordlist,TypeList[1:],x['start'],outlist))
         
 def parralelproc(params,df,func,n_cores=os.cpu_count()):
@@ -354,10 +370,11 @@ def extractdf(contents,filename):
 
 def weighted_random(pairs):
     total = sum(pair[1] for pair in pairs)
-    r = random.uniform(0, total)
+    r = random.uniform(0,total)
     for (name, weight) in pairs:
-        r -= weight
-        if r <= 0: return name
+        r= r- float(weight)
+        if r <= 0.1: return name
+    return pairs[-1][0]
 
 def parse_contents(contents, filename, date):
     global df,TextFields,GroupFields,keys
@@ -415,16 +432,17 @@ def TextRankAnalyse(tr4w, text,wtype):
     out=list()
     try:
         tr4w.analyze(text, candidate_pos = [wtype], window_size=4, lower=False)#
-        out=tr4w.get_keywords(10)
-    except: #text is series
+        out=tr4w.get_keywords()
+    except Exception as e: #text is series
+        print(e)
         out=list()
         for i in text.values.tolist():
             if len(str(i))>17:   #I presume this is therefore a good text to learn on. 
                 tr4w.analyze(str(i), candidate_pos = [wtype], window_size=4, lower=False)
-                out=out+tr4w.get_keywords(10)
+                out=out+tr4w.get_keywords()
     return out
 
-def CreateTensorBoard(Strings,Text,model, out_loc=".", name="spaCy_vectors"):
+def CreateTensorBoard(df, Strings,Text,wordmodel, out_loc=".", name="spaCy_vectors"):
     
     import tensorflow as tf
     from tensorboard.plugins import projector
@@ -434,10 +452,21 @@ def CreateTensorBoard(Strings,Text,model, out_loc=".", name="spaCy_vectors"):
         ProjectorConfig,
     )
     tf.compat.v1.disable_eager_execution()
+
     Texts=" ".join(Text).split("\n")
+    Columns=filter(lambda x:df[x].map(lambda x: len(str(x))).max()>100, df)
+    tensors={}
+    for column in Columns:
+        Strings=list(df[column].map(lambda text: Response(str(text).lower())).values.tolist())
+        Strings=Strings+Texts
+        embeddings={String:wordmodel.infer_vector(String.split()) for String in Strings}
+        embeddings_vectors = np.stack(embeddings.values(), axis=0)
+        tensors[column]=tf.Variable(embeddings_vectors, name=column)
+   
     Strings=Strings+Texts
-    embeddings={String:model.infer_vector(String.split()) for String in Strings}
+    embeddings={String:wordmodel.infer_vector(String.split()) for String in Strings}
     embeddings_vectors = np.stack(embeddings.values(), axis=0)
+
     '''
         # Create some variables.
     emb = tf.Variable(embeddings_vectors, name='word_embeddings')
@@ -453,32 +482,27 @@ def CreateTensorBoard(Strings,Text,model, out_loc=".", name="spaCy_vectors"):
         sess.run(init_op)
     '''
     sess = tf.compat.v1.InteractiveSession()
-    emb=tf.Variable(embeddings_vectors, name=name) 
-    tf.compat.v1.global_variables_initializer()
+    emb=tf.Variable(embeddings_vectors, name='embeddings') 
+    init_op=tf.compat.v1.global_variables_initializer()
     saver = tf.compat.v1.train.Saver([emb])
-    words = '\n'.join(list(embeddings.keys()))
+    saver2=tf.compat.v1.train.Saver(tensors.values())
+    words = list(embeddings.keys())
     with open(os.path.join(out_loc, 'metadata.tsv'), 'w') as f:
-        f.write(words)
-    meta_file = "{}.tsv".format('metadata')
-    save_path = saver.save(sess, os.path.join(out_loc, "{}.ckpt".format(name)))
-    print("Model saved in path: %s" % save_path)
-
-    metadata_path = os.path.join(out_loc, 'metadata.tsv')
-    with open(metadata_path, "w") as f:
         [f.write(word + "\n") for word in words]
-
-    if not os.path.exists(out_loc):
-        os.mkdir(out_loc)
-
+    #meta_file = "{}.tsv".format('metadata')
+    sess.run(init_op)
+    save_path = saver.save(sess, os.path.join(out_loc, "{}.ckpt".format(name)))
+    save2_path=saver2.save(sess, os.path.join(out_loc, "{}.ckpt".format(name)))
+    print("Model saved in path: %s" % save_path)
+    '''    
     summary_writer = tf.summary.FileWriter(out_loc, graph=sess.graph, )
     # Link the embeddings into the config
     config = ProjectorConfig()
     embed = config.embeddings.add()
     embed.tensor_name = name
-
     embed.metadata_path = os.path.join(log_dir, 'metadata.tsv')
     visualize_embeddings(summary_writer, config)
-
+    '''
     # Tell the projector about the configured embeddings and metadata file
     #visualize_embeddings(writer, config)
     

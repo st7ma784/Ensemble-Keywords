@@ -38,8 +38,8 @@ def sentiment(df,Column,Group,Text):
     newdf = df[~df[Column].isnull()] #filter out empty rows
     #filter by group
     print(Text)
-    df["TextEmbedding"] = df[Column].map(lambda text: Response(str(text).lower()))
-    port=CreateTensorBoard(list(df["TextEmbedding"].values.tolist()),Text,docmodel)
+    newdf["TextEmbedding"] = df[Column].map(lambda text: Response(str(text).lower()))
+    port=CreateTensorBoard(newdf,list(newdf["TextEmbedding"].values.tolist()),Text,docmodel)
     return "Opened Tensorboard at port {}.".format(port)
     '''
     Traces={}

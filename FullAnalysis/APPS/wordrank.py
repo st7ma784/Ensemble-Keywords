@@ -32,14 +32,14 @@ sentences=["The ADJ NOUN ADV TRANVERBs the NOUN.",
 
 
 
-def wordrankpoem(newdf,Column,poem):
+def wordrankpoem(newdf,Column,poem,metaphor=1):
     if Column=="*":
             Column=list(filter(lambda x:newdf[x].map(lambda x: len(str(x))).max()>100, newdf))
     newdf = newdf[~newdf[Column].isnull()] #filter out empty rows
     if poem=="None":
         poem=random.sample(sentences,10)
         poem="\n".join(poem)
-    poem=buildPoem(newdf,Column,poem)
+    poem=buildPoem(newdf,Column,poem,metaphor)
     return poem
 
 def wordrankpersubgroup(Column,Type,name,group,df):
@@ -71,10 +71,10 @@ def run(df):
         dcc.Dropdown(id='wordrankwordtype',options=Wordtypes,style={'width': '100\%'}),    
         html.P('view most common words across by group:'),
         dcc.Dropdown(id='wordrankgroup-dropdown',style={'width': '100\%'}),
-           
         html.Div(id='filterTextOut'),
-        dcc.Upload(id='upload-poem-template',children=html.Div(['Drag and Drop or ',html.A('Select Files')]),style={'width': '100%', 'border':'1px'},),    
 
+        dcc.Upload(id='upload-poem-template',children=html.Div(['Drag and Drop or ',html.A('Select Files')]),style={'width': '100%', 'border':'1px'},),    
+        dcc.Dropdown(id='poemmethod-dropdown',options=[{'label': 'Graphed', 'value': 1},{'label': 'Random', 'value': 0}],style={'width': '100\%'}),
         html.P('Here\'s a poem generated with responses in this column'),
         html.Div(id='PoemOut'),
     ]

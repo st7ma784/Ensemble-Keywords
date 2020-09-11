@@ -83,13 +83,13 @@ def main():
    
 
     #give back a poem based on out picked group
-    @app.callback(Output('PoemOut', 'children'),[Input('wordranktext-select','value'),Input('intermediate-value', 'children'),Input('upload-poem-template', 'contents')],[State('upload-poem-template', 'filename')])
-    def updatepoem(Column,jsondf,list_of_contents, list_of_names):
+    @app.callback(Output('PoemOut', 'children'),[Input('wordranktext-select','value'),Input('poemmethod-dropdown','value'),Input('upload-poem-template', 'contents')],[State('upload-poem-template', 'filename'),State('intermediate-value', 'children')])
+    def updatepoem(Column,metaphor,list_of_contents, list_of_names,jsondf):
         poem=readtextfile(list_of_contents, list_of_names)
         newdf = pd.read_json(jsondf, orient='split')
         mod = importlib.import_module("APPS.wordrank")
         wordrank = getattr(mod, "wordrankpoem")
-        return wordrank(newdf,Column,poem)
+        return wordrank(newdf,Column,poem,metaphor)
 
     #find preferred word type of given subgroup of group
     @app.callback(Output('filterTextOut', component_property='children'),[Input('wordranktext-select','value'),Input('wordrankwordtype','value'),Input('wordrankgroup-dropdown', 'value'),Input('wordrankgroup-select', 'value'),Input('intermediate-value', 'children')])
@@ -136,12 +136,12 @@ def main():
 
     #<<<<<< ---------------- GRAPH RESPONSES CALLBACK ----------------->>>>>>>>>>>    
 
-    @app.callback(Output('distancegraph', 'figure'),[Input('Distancetext-select','value'),Input('distance-slider','value'),Input('intermediate-value', 'children')])
+    @app.callback(Output('distancegraph', 'figure'),[Input('Distancestext-select','value'),Input('distance-slider','value'),Input('intermediate-value', 'children')])
     def drawpolaritygraph(Column,threshold,jsondf):
         df = pd.read_json(jsondf, orient='split')
         mod = importlib.import_module("APPS.visualizedistance")
         sentiment = getattr(mod, "visualizedistance")
-        return visualizedistance(df,threshold,Column)
+        return sentiment(df,threshold,Column)
     
     #<<<<<< ---------------- RUN  ------------------->>>>>>>>>>>
 

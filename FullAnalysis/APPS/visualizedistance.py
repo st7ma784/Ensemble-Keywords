@@ -17,9 +17,17 @@ import os
 from gensim.matutils import jaccard
 DEBUG=bool(os.environ['DEBUG'])
 import networkx as nx
-docmodel=Doc2Vec.load("/app/UTILS/model/sentsmodel.bin")
-def visualizedistance(df,threshold,Column=None):
-    df['VectorList']=df[Column].map(lambda text: docmodel.infer_vector(text.split))
+from gensim.models import doc2vec
+from UTILS.utils import *
+'''
+from gensim.models import Sent2Vec
+sents = Sent2Vec(common_texts, size=100, min_count=1)'''
+#model=KeyedVectors.load_word2vec_format(datapath("/app/UTILS/model/model.gz"), binary=False)
+docmodel=doc2vec.Doc2Vec.load("/app/UTILS/model/sentsmodel.bin")
+def visualizedistance(df,threshold,Column):
+    
+    newdf = df[~df[Column].isnull()] #filter out empty rows
+    new['VectorList']=newdf[Column].map(lambda text: docmodel.infer_vector(text.split()))
     G = nx.Graph()
     map(lambda i,vector: G.add_node(i),enumerate(df['VectorList']))
     texts=df[Column].unique()
