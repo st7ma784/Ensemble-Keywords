@@ -16,8 +16,9 @@ import spacy
 import tqdm
 import networkx as nx
 DEBUG=bool(os.environ['DEBUG'])
+from spacy.tokens import Token
 
-import spacy,os
+import os
 from collections import OrderedDict,defaultdict
 
 from spacy.lang.en.stop_words import STOP_WORDS
@@ -272,6 +273,7 @@ def buildPoem(df,Column,poem,metaphor=1):
     if metaphor==1:
         #poem=poem.split("\n")
         finished=[]
+        Token.set_extension("used", default=False)
         doc=nlp(poem)
         '''sentences = []
         lemma_tags = {"NNS", "NNPS","VBD","VBG","VBN","VBP","VBZ"}
@@ -293,17 +295,17 @@ def buildPoem(df,Column,poem,metaphor=1):
             #parts=sentence.split(" ")
             #while any(item in wordtypes for item in sentence):
             out=[]
-            while any(word.text in wordtypes for word in sentence):
+            while any(word.text in wordtypes and not word._.used for word in sentence):
                 for word in sentence:
-                    if word.text in wordtypes and word.i>len(out):
+                    if word.text in wordtypes:
                         i=word.i
                         for j in range(len(sentence),i,-1):
-                            if all(word.text in wordtypes for word in sentence[i:j]):
+                            if all(word.text in wordtypes and not word._.used for word in sentence[i:j]):
                                 graphsearch=TraverseGraph(wordgraph,wordlist,[word.text for word in sentence[i:j]])                            
                                 if DEBUG: 
                                     print(graphsearch)
-                                #for x in range(len(graphsearch)): 
-                                out=out+graphsearch #these are letters not TOKENS !!! ARGS
+                                for word in sentence[i:i+len(graphsearch)]:
+                                    word._.used=True
                     else:
                         out=out+[word.text]
 
