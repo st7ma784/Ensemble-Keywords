@@ -254,7 +254,7 @@ def buildPoem(df,Column,poem,metaphor=1):
     if DEBUG:
         print(wordtypes)
     newdf = df[~df[Column].isnull()]
-    wordlist={wtype:createWordList(df[Column],wtype) for wtype in wordtypes}#:parralelproc(wordtypes,newdf[Column],createWordList)#create our wordlist
+    wordlist={wtype:createWordList(newdf[Column],wtype) for wtype in wordtypes}#:parralelproc(wordtypes,newdf[Column],createWordList)#create our wordlist
     wordgraph=pd.DataFrame()
     wordgraph["relations"]=buildknowledgebase(newdf[Column])
     wordgraph["start"]=wordgraph["relations"].apply(lambda x: x[0])
@@ -270,31 +270,45 @@ def buildPoem(df,Column,poem,metaphor=1):
     
     
     if metaphor==1:
-        poem=poem.split("\n")
+        #poem=poem.split("\n")
         finished=[]
-        for sentence in poem:
-            parts=sentence.split(" ")
+        doc=nlp(poem)
+        '''sentences = []
+        lemma_tags = {"NNS", "NNPS","VBD","VBG","VBN","VBP","VBZ"}
+        for sent in doc.sents:
+            selected_words = []
+            for token in sent:
+                pos=self.check_verb(token)
+                #check for compound noun.
+                if (pos in candidate_pos or token.tag_ in candidate_pos) and token.is_stop is False:
+
+                    text=token.text    
+                    if token.tag_ in lemma_tags:   #de pluralize nouns
+                        text = token.lemma_
+                    if lower is True:
+                        selected_words.append(text.lower())
+                    else:
+                        selected_words.append(text)'''
+        for sentence in doc.sents:
+            #parts=sentence.split(" ")
             #while any(item in wordtypes for item in sentence):
-            i=0
-            while any(word in wordtypes for word in parts):
-                for word in wordtypes:
-                    if word in parts:
-                        i=parts.index(word)
-                        break
-                for j in range(len(parts),i,-1):
-                    if all(word in wordtypes for word in parts[i:j]):
-                        
-                        graphsearch=TraverseGraph(wordgraph,wordlist,parts[i:j])                            
-                        if DEBUG: 
-                            print(graphsearch)
-                        for word in range(len(graphsearch)): 
-                            parts[i+word]=graphsearch[word] #these are letters not TOKENS !!! ARGS
-                        
-                        
-                if i>=len(parts): 
-                    i=0
-            finished+=parts
-        poem="\n".join(finished)
+            out=[]
+            while any(word.text in wordtypes for word in sentence):
+                for word in sentence:
+                    if word.text in wordtypes and word.i>len(out):
+                        i=word.i
+                        for j in range(len(sentence),i,-1):
+                            if all(word.text in wordtypes for word in sentence[i:j]):
+                                graphsearch=TraverseGraph(wordgraph,wordlist,[word.text for word in sentence[i:j]])                            
+                                if DEBUG: 
+                                    print(graphsearch)
+                                #for x in range(len(graphsearch)): 
+                                out=out+graphsearch #these are letters not TOKENS !!! ARGS
+                    else:
+                        out=out+[word.text]
+
+        #finished+=" ".join(out)
+        poem=" ".join(out)
     if metaphor!=1:
         for wtype in wordtypes:
             if wtype in poem:
