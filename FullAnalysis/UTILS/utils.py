@@ -17,7 +17,7 @@ import tqdm
 import networkx as nx
 DEBUG=bool(os.environ['DEBUG'])
 from spacy.tokens import Token
-
+from spacy.matcher import Matcher
 import os
 from collections import OrderedDict,defaultdict
 
@@ -273,8 +273,17 @@ def buildPoem(df,Column,poem,metaphor=1):
     if metaphor==1:
         #poem=poem.split("\n")
         finished=[]
-        Token.set_extension("used", default=False)
+        Token.set_extension("used", default=False,force=True)
         doc=nlp(poem)
+        out=[]
+        matcher = Matcher(nlp.vocab)
+        def Match(matcher, doc, i, matches):
+            spans = [(start,end, doc[start : end]) for ent_id, start, end in matches]
+            for span in spans:
+                out[span[0]:span[1]]=TraverseGraph(wordgraph,wordlist,span[2])
+        
+
+
         '''sentences = []
         lemma_tags = {"NNS", "NNPS","VBD","VBG","VBN","VBP","VBZ"}
         for sent in doc.sents:
@@ -294,23 +303,29 @@ def buildPoem(df,Column,poem,metaphor=1):
         for sentence in doc.sents:
             #parts=sentence.split(" ")
             #while any(item in wordtypes for item in sentence):
-            out=[]
-            while any(word.text in wordtypes and not word._.used for word in sentence):
-                for word in sentence:
-                    if word.text in wordtypes:
-                        i=word.i
+            
+            #while any(word.text in wordtypes and not word._.used for word in sentence):
+            for word in sentence:
+                '''if word.text.encode('utf8') in wordtypes:
+                    i=word.i
+                    if not word._.used:
                         for j in range(len(sentence),i,-1):
-                            if all(word.text in wordtypes and not word._.used for word in sentence[i:j]):
-                                graphsearch=TraverseGraph(wordgraph,wordlist,[word.text for word in sentence[i:j]])                            
-                                if DEBUG: 
-                                    print(graphsearch)
-                                for word in sentence[i:i+len(graphsearch)]:
-                                    word._.used=True
-                    else:
-                        out=out+[word.text]
-
+                            if not word._.used:
+                                if all(word.text.encode('utf8') in wordtypes for word in sentence[i:j]):
+                                    graphsearch=TraverseGraph(wordgraph,wordlist,[word.text for word in sentence[i:j]])                            
+                                    if DEBUG: 
+                                        print(graphsearch)
+                                    for found in graphsearch:
+                                        out=out+[found] 
+                                    for word in sentence[i:i+len(graphsearch)]:
+                                        word._.used=True
+                else:'''           
+                out=out+[word.text]
+        pattern=[{"TEXT": {"IN":wordtypes},'OP':'+'}]
+        matcher.add('WORDTYPES', [pattern], on_match=Match)
+        matches = matcher(doc)
         #finished+=" ".join(out)
-        poem=" ".join(out)
+        poem="\n".join([poem," ".join(out)])
     if metaphor!=1:
         for wtype in wordtypes:
             if wtype in poem:
@@ -326,23 +341,23 @@ def buildPoem(df,Column,poem,metaphor=1):
 
     return poem
 
+        
 def TraverseGraph(graphtuples,wordlist,TypeList, startnodes=None,outlist=[]):
-    if startnodes is None:
-        #newdf=
-        return TraverseGraph(graphtuples,wordlist,TypeList,graphtuples.loc[graphtuples["starttype"]==TypeList[0]]["start"].values.tolist(),outlist=[])
+    if ((startnodes is None) or (startnodes is list())):
+        return TraverseGraph(graphtuples,wordlist,TypeList,graphtuples.loc[graphtuples["starttype"] == TypeList[0]]["start"].values.tolist(),outlist=[])
     #we have our list of potential start words -> We'll do a weighted random 
     AddedWord=weighted_random(list(filter(lambda word: word[0] in startnodes, wordlist[TypeList[0]])))
     outlist=outlist+[AddedWord]
     #if there are no more words left to find, lets stop there.
-    if len(TypeList)==1: # end case our types is just defining the word choices we've been passed. none left to find
+    if len(TypeList)<=1: # end case our types is just defining the word choices we've been passed. none left to find
         return outlist
     else: #not first case nor last so there are words left to find and we've added one. 
         #what if nextsteps is empty 
-        try:
-            #newdf = #df[~df[Column].isnull()].values.tolist()
-            return TraverseGraph(graphtuples,wordlist,TypeList[1:],graphtuples.loc[graphtuples["start"].equals(AddedWord) and graphtuples["targettype"].equals(TypeList[1])]["target"],outlist)
-        except Exception as e:
-            print("Failed to find tuple starting with {0} to type {1}".format(AddedWord,TypeList[0]))
+        nextsteps =graphtuples.loc[graphtuples["start"] == AddedWord].loc[graphtuples["targettype"] == TypeList[1]]["target"].values.tolist()#df[~df[Column].isnull()].values.tolist()
+        if len(nextsteps)>0:
+            return TraverseGraph(graphtuples,wordlist,TypeList[1:],nextsteps,outlist)
+        else:
+        #    print("Failed to find tuple starting with {0} to type {1}".format(AddedWord,TypeList[0]))
             return outlist
         #pic random and return from return Routes.map(lambda x: TraverseGraph(graphtuples, wordlist,TypeList[1:],x['start'],outlist))
         
@@ -385,6 +400,8 @@ def extractdf(contents,filename):
         return pd.read_excel(BytesIO(decoded),header=0)
 
 def weighted_random(pairs):
+    if len(pairs)==0:
+        return ""
     total = sum(pair[1] for pair in pairs)
     r = random.uniform(0,total)
     for (name, weight) in pairs:
