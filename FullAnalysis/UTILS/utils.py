@@ -143,7 +143,6 @@ class TextRank4Keyword():
             for token in sent:
                 pos=self.check_verb(token)
                 if pos in self.wordtypes:
-
                     text=pos 
                     selected_words.append(text.upper())
                 else:
@@ -168,33 +167,7 @@ class TextRank4Keyword():
             print("WordTypes",[(self.check_verb(t),self.check_verb(t.head)) for t in  filter(lambda w: w.dep_ in ("compound","amod", "dobj"), doc)])
         self.knowledgebase=set((t.text, t.dep_, t.head.text) for t in doc)
 
-        '''
-        # merge entities and noun chunks into one token
-        spans = list(doc.ents) + list(doc.noun_chunks)
-        with doc.retokenize() as retokenizer:
-            for span in spans:
-                retokenizer.merge(span)
 
-        relations = []
-        for money in filter(lambda w: w.ent_type_ == "MONEY", doc):
-            if money.dep_ in ("attr", "dobj"):
-                subject = [w for w in money.head.lefts if w.dep_ == "nsubj"]
-                if subject:
-                    subject = subject[0]
-                    relations.append((subject, money))
-            elif money.dep_ == "pobj" and money.head.dep_ == "prep":
-                relations.append((money.head.head, money))
-        return relations
-
-
-        print("Processing %d texts" % len(TEXTS))
-
-        for text in TEXTS:
-            doc = nlp(text)
-            relations = extract_currency_relations(doc)
-            for r1, r2 in relations:
-                print("{:<10}\t{}\t{}".format(r1.text, r2.ent_type_, r2.text))
-        '''
         return set((t.text, t.dep_, t.head.text,self.check_verb(t),self.check_verb(t.head)) for t in doc)
         
     def analyze(self, text, 
@@ -277,55 +250,24 @@ def buildPoem(df,Column,poem,metaphor=1):
         doc=nlp(poem)
         out=[]
         matcher = Matcher(nlp.vocab)
+        out=[token.text for token in doc]
+
         def Match(matcher, doc, i, matches):
             spans = [(start,end, doc[start : end]) for ent_id, start, end in matches]
-            for span in spans:
-                out[span[0]:span[1]]=TraverseGraph(wordgraph,wordlist,span[2])
-        
-
-
-        '''sentences = []
-        lemma_tags = {"NNS", "NNPS","VBD","VBG","VBN","VBP","VBZ"}
-        for sent in doc.sents:
-            selected_words = []
-            for token in sent:
-                pos=self.check_verb(token)
-                #check for compound noun.
-                if (pos in candidate_pos or token.tag_ in candidate_pos) and token.is_stop is False:
-
-                    text=token.text    
-                    if token.tag_ in lemma_tags:   #de pluralize nouns
-                        text = token.lemma_
-                    if lower is True:
-                        selected_words.append(text.lower())
-                    else:
-                        selected_words.append(text)'''
-        for sentence in doc.sents:
-            #parts=sentence.split(" ")
-            #while any(item in wordtypes for item in sentence):
-            
-            #while any(word.text in wordtypes and not word._.used for word in sentence):
-            for word in sentence:
-                '''if word.text.encode('utf8') in wordtypes:
-                    i=word.i
-                    if not word._.used:
-                        for j in range(len(sentence),i,-1):
-                            if not word._.used:
-                                if all(word.text.encode('utf8') in wordtypes for word in sentence[i:j]):
-                                    graphsearch=TraverseGraph(wordgraph,wordlist,[word.text for word in sentence[i:j]])                            
-                                    if DEBUG: 
-                                        print(graphsearch)
-                                    for found in graphsearch:
-                                        out=out+[found] 
-                                    for word in sentence[i:i+len(graphsearch)]:
-                                        word._.used=True
-                else:'''           
-                out=out+[word.text]
+            for (start,end,words) in spans:
+                covered=0
+                target=len(words)
+                print(" Output of {0} is {1}".format(words,BetterTraverseGraph(graphtuples,wordlist,words)))
+                while covered<target:
+                    found=TraverseGraph(wordgraph,wordlist,words[covered:target])
+                    if covered+len(found)>target:
+                        found=found[:target-covered]
+                    out[start+covered:start+covered+len(found)]=found
+                    covered+=len(found)
         pattern=[{"TEXT": {"IN":wordtypes},'OP':'+'}]
         matcher.add('WORDTYPES', [pattern], on_match=Match)
         matches = matcher(doc)
-        #finished+=" ".join(out)
-        poem="\n".join([poem," ".join(out)])
+        poem=" ".join(out)
     if metaphor!=1:
         for wtype in wordtypes:
             if wtype in poem:
@@ -341,25 +283,54 @@ def buildPoem(df,Column,poem,metaphor=1):
 
     return poem
 
-        
+def getRoutes(graphtuples,TypeList,start=None):
+
+    possibletuples=graphtuples.loc[graphtuples["starttype"]==TypeList[0].text]
+    if start not None:
+        possibletuples=possibletuples.loc["start"==start]
+    if len(TypeList)>1:
+        return possibletuples.loc[any(possibletuples["target"]==traversegraph[graphtuples,wordlist,TypeList[1:],startnodes,outlist]["start"])]
+    else:
+        return possibletuples    
+
 def TraverseGraph(graphtuples,wordlist,TypeList, startnodes=None,outlist=[]):
-    if ((startnodes is None) or (startnodes is list())):
-        return TraverseGraph(graphtuples,wordlist,TypeList,graphtuples.loc[graphtuples["starttype"] == TypeList[0]]["start"].values.tolist(),outlist=[])
-    #we have our list of potential start words -> We'll do a weighted random 
-    AddedWord=weighted_random(list(filter(lambda word: word[0] in startnodes, wordlist[TypeList[0]])))
-    outlist=outlist+[AddedWord]
-    #if there are no more words left to find, lets stop there.
+    '''
+    start=startnodes
+    for i in range(0,len(TypeList)):
+        df=getRoutes[graphtuples,TypeList[i:],start]
+        possiblelist=list(filter(lambda word: word[0] in set(df["start"].values.tolist()), wordlist[TypeList[i].text]))
+        start=weighted_random(possiblelist)
+        outlist.append(start)
+    '''
+    if ((startnodes is None) or (len(startnodes)<1)):
+        return TraverseGraph(graphtuples,wordlist,TypeList,graphtuples.loc[graphtuples["starttype"] == TypeList[0].text]["start"].values.tolist(),outlist=outlist)
+    possiblelist=list(filter(lambda word: word[0] in startnodes, wordlist[TypeList[0].text]))
+    AddedWord=weighted_random(possiblelist)
     if len(TypeList)<=1: # end case our types is just defining the word choices we've been passed. none left to find
-        return outlist
+        return outlist+[AddedWord]
     else: #not first case nor last so there are words left to find and we've added one. 
         #what if nextsteps is empty 
-        nextsteps =graphtuples.loc[graphtuples["start"] == AddedWord].loc[graphtuples["targettype"] == TypeList[1]]["target"].values.tolist()#df[~df[Column].isnull()].values.tolist()
-        if len(nextsteps)>0:
-            return TraverseGraph(graphtuples,wordlist,TypeList[1:],nextsteps,outlist)
-        else:
+        nextsteps =graphtuples.loc[graphtuples["start"] == AddedWord].loc[graphtuples["targettype"] == TypeList[1].text]["target"].values.tolist()#df[~df[Column].isnull()].values.tolist()
+        while len(nextsteps)<=0:
+            possiblelist=list(filter(lambda word: not(word[0] == AddedWord), possiblelist))
+            if len(possiblelist)==0:
+                return outlist
+            AddedWord=weighted_random(possiblelist)
+            nextsteps =graphtuples.loc[graphtuples["start"] == AddedWord].loc[graphtuples["targettype"] == TypeList[1].text]["target"].values.tolist()#df[~df[Column].isnull()].values.tolist()
+        return TraverseGraph(graphtuples,wordlist,TypeList[1:],nextsteps,outlist)
         #    print("Failed to find tuple starting with {0} to type {1}".format(AddedWord,TypeList[0]))
-            return outlist
-        #pic random and return from return Routes.map(lambda x: TraverseGraph(graphtuples, wordlist,TypeList[1:],x['start'],outlist))
+def BetterTraverseGraph(graphtuples,wordlist,TypeList, startnodes=None,outlist=[]):
+    if len(TypeList)==1:
+        return graphtuples.loc[(graphtuples["starttype"] == TypeList[0].text) ]#| graphtuples["targettype"] == TypeList[0].text ]
+    if len(TypeList)==2:
+        return graphtuples.loc[graphtuples["starttype"] == TypeList[0].text].loc[graphtuples["targettype"] == TypeList[1].text]
+    if len(TypeList)>2:
+        startdf=graphtuples.loc[graphtuples["starttype"] == TypeList[0].text]
+        finaldf=graphtuples.loc[graphtuples["targettype"] == TypeList[len(TypeList)-1].text]
+        link=BetterTraverseGraph(graphtuples,wordlist,TypeList[1:-1],startnodes,outlist)
+        startdf=startdf.loc[any(startdf["target"]==link["start"])]
+        finaldf=finaldf.loc[any(finaldf["start"]==link["target"])]
+      '''
         
 def parralelproc(params,df,func,n_cores=os.cpu_count()):
     #print(params)
@@ -400,14 +371,12 @@ def extractdf(contents,filename):
         return pd.read_excel(BytesIO(decoded),header=0)
 
 def weighted_random(pairs):
-    if len(pairs)==0:
-        return ""
     total = sum(pair[1] for pair in pairs)
     r = random.uniform(0,total)
     for (name, weight) in pairs:
         r= r- float(weight)
         if r <= 0.1: return name
-    return pairs[-1][0]
+    return pairs[0][0]
 
 def parse_contents(contents, filename, date):
     global df,TextFields,GroupFields,keys
