@@ -257,7 +257,7 @@ def buildPoem(df,Column,poem,metaphor=1):
             for (start,end,words) in spans:
                 covered=0
                 target=len(words)
-                print(" Output of {0} is {1}".format(words,BetterTraverseGraph(graphtuples,wordlist,words)))
+                #print(" Output of {0} is {1}".format(words,BetterTraverseGraph(graphtuples,wordlist,words)))
                 while covered<target:
                     found=TraverseGraph(wordgraph,wordlist,words[covered:target])
                     if covered+len(found)>target:
@@ -271,7 +271,6 @@ def buildPoem(df,Column,poem,metaphor=1):
     if metaphor!=1:
         for wtype in wordtypes:
             if wtype in poem:
-                
                 while wtype in poem:
                     wchoice=weighted_random(wordlist[wtype])
                     if wchoice is None:
@@ -304,7 +303,7 @@ def TraverseGraph(graphtuples,wordlist,TypeList, startnodes=None,outlist=[]):
     '''
     if ((startnodes is None) or (len(startnodes)<1)):
         return TraverseGraph(graphtuples,wordlist,TypeList,graphtuples.loc[graphtuples["starttype"] == TypeList[0].text]["start"].values.tolist(),outlist=outlist)
-    possiblelist=list(filter(lambda word: word[0] in startnodes, wordlist[TypeList[0].text]))
+    possiblelist=itertools.chain.from_iterable([list(filter(lambda word: word[0] in startnodes, wordlist[typ])) for typ in wordlist])
     AddedWord=weighted_random(possiblelist)
     if len(TypeList)<=1: # end case our types is just defining the word choices we've been passed. none left to find
         return outlist+[AddedWord]
@@ -330,7 +329,7 @@ def BetterTraverseGraph(graphtuples,wordlist,TypeList, startnodes=None,outlist=[
         link=BetterTraverseGraph(graphtuples,wordlist,TypeList[1:-1],startnodes,outlist)
         startdf=startdf.loc[any(startdf["target"]==link["start"])]
         finaldf=finaldf.loc[any(finaldf["start"]==link["target"])]
-      '''
+      
         
 def parralelproc(params,df,func,n_cores=os.cpu_count()):
     #print(params)
@@ -376,7 +375,7 @@ def weighted_random(pairs):
     for (name, weight) in pairs:
         r= r- float(weight)
         if r <= 0.1: return name
-    return pairs[0][0]
+    return pairs[-1][0]
 
 def parse_contents(contents, filename, date):
     global df,TextFields,GroupFields,keys
