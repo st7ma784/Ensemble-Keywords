@@ -285,7 +285,7 @@ def buildPoem(df,Column,poem,metaphor=1):
 def getRoutes(graphtuples,TypeList,start=None):
 
     possibletuples=graphtuples.loc[graphtuples["starttype"]==TypeList[0].text]
-    if start not None:
+    if start is not None:
         possibletuples=possibletuples.loc["start"==start]
     if len(TypeList)>1:
         return possibletuples.loc[any(possibletuples["target"]==traversegraph[graphtuples,wordlist,TypeList[1:],startnodes,outlist]["start"])]

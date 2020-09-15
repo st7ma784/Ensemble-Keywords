@@ -8,3 +8,5 @@ services:
             - 6000-6010:6000-6010
         env_file:
             - ./FullAnalysis/.env    
+        volumes:
+            - './DATA/OUTPUTS:/app/OUTPUTS'

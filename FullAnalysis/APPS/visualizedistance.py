@@ -102,6 +102,7 @@ def visualizedistance(df,threshold,Column):
                 yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
                 )
     fig = go.Figure(data=data,layout=layout)
+    fig.write_html("/app/OUTPUTS/distance{}.html".format(Column))
     return fig
 
 def run(df): 

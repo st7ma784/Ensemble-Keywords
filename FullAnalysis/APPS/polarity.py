@@ -29,7 +29,7 @@ def polarity(df,Column=None,Group=None):
             b=random.randint(0,255)
             Traces[grp]=go.Box(
                 y=df.loc[df[Group] == grp]['polarity'],
-                name = grp,
+                name = str(grp),
                 marker = dict(
                     color = ''.join(['rgb(',str(r),", ", str(g), ", ", str(b),' )'])
                 )
@@ -42,13 +42,15 @@ def polarity(df,Column=None,Group=None):
                 )
             )
     
-    Figures=OrderedDict(sorted(Traces.items(), key=lambda t: str(t[0])[:2], reverse=False))
+    Figures=OrderedDict(sorted(Traces.items(), key=lambda t: str(t[0]), reverse=False))
 
     data = list(Figures.values())
     layout = go.Layout(
-        title = "Sentiment by group"
+        title = "Sentiment for {0}  Grouped by {1}".format(Column.replace("/", ""),Group.replace("/", "")) #change this 
     )
     fig = go.Figure(data=data,layout=layout)
+    fig.write_html("/app/OUTPUTS/polarity{0}by{1}.html".format(Column.replace("/", ""),Group.replace("/", ""))) #remove / chars 
+
     return fig
 
 def run(df): 
